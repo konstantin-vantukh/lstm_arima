@@ -1,0 +1,125 @@
+```yaml
+# ========================================================================
+# CONTRACT: CRYPTO LSTM-ARIMA FORECASTING MODULE
+# ========================================================================
+# This contract implements a hybrid forecasting module for cryptocurrency 
+# time series, combining traditional statistical modeling (ARIMA) for 
+# linear components and deep learning (LSTM) for nonlinear residuals.
+# ========================================================================
+
+module:
+  name: "crypto_lstm_arima_forecaster"
+  path: "scripts/forecasting_hybrid.py"
+  version: "1.0.0"
+  description: |
+    The module implements a robust hybrid model that encompasses both linearity and non-linearity within 
+    crypto-asset datasets. It assumes a time series $x_t$ is composed of a linear component ($L_t$), 
+    a non-linear component ($N_t$), and an error term ($\epsilon_t$). 
+    The ARIMA component filters linear tendencies, passing the residuals to the LSTM component 
+    to handle non-linear structures and random errors.
+
+requirements:
+  functional:
+    - id: FR1
+      description: "Module must ingest OHLCV data and ensure continuity by removing gaps or imputing missing values."
+    - id: FR2
+      description: "Perform Augmented Dickey-Fuller (ADF) tests to determine stationarity and apply differencing ($d$) as needed."
+    - id: FR3
+      description: "Identify optimal ARIMA $(p, d, q)$ parameters using Auto-ARIMA or minimizing the Akaike Information Criterion (AIC)."
+    - id: FR4
+      description: "Extract residuals from ARIMA predictions and reshape them into a 3D tensor format [Samples, Time Steps, Features] for LSTM input."
+    - id: FR5
+      description: "Implement LSTM training with an ADAM optimizer, utilizing an early stopping mechanism to prevent overfitting."
+    - id: FR6
+      description: "Combine the linear prediction from ARIMA with the non-linear residual forecast from LSTM for the final hybrid output."
+  nonFunctional:
+    - id: NFR1
+      description: "Support Python 3.11+."
+    - id: NFR2
+      description: "Accuracy evaluation must be reported using Root Mean Squared Error (RMSE) and Mean Absolute Error (MAE)."
+    - id: NFR3
+      description: "Parallel computing via OpenCL should be supported for the LSTM block if hardware is available."
+
+interface:
+  publicFunctions:
+    - name: "run_hybrid_forecast"
+      signature: "run_hybrid_forecast(data: pd.DataFrame, forecast_horizon: int) -> dict"
+      behavior: |
+        The function executes the complete hybrid workflow: preprocessing, ARIMA linear fitting, 
+        LSTM residual training on a rolling window, and summation of final results.
+      inputs:
+        - name: "data"
+          type: "pd.DataFrame"
+          description: "Cleaned cryptocurrency price time series."
+        - name: "forecast_horizon"
+          type: "int"
+          description: "Number of time steps to forecast into the future."
+      outputs:
+        - name: "forecast_results"
+          type: "dict"
+          description: "Dictionary containing hybrid predictions and performance metrics (RMSE/MAE)."
+      dependencies:
+        - "pandas"
+        - "numpy"
+        - "statsmodels" # for ARIMA and ADF tests
+        - "keras" # for LSTM modeling
+        - "tensorflow" # backend for Keras
+
+configExpectations:
+  - path: "config/model_params.yml"
+    minimal_keys:
+      - "lstm.hidden_layers" # default 1
+      - "lstm.nodes" # suggested range 5-20
+      - "lstm.batch_size" # e.g., 64
+      - "arima.seasonal" # True/False for seasonal ARIMA
+
+implementation:
+  language: "python"
+  min_python: "3.11"
+  stdlib:
+    - "pathlib"
+    - "logging"
+    - "math"
+  thirdParty:
+    - "pandas"
+    - "numpy"
+    - "statsmodels"
+    - "tensorflow"
+  style:
+    - "Code and variables in English."
+    - "Use informative exception handling for non-converging ARIMA models."
+    - "Implement logging for training progress (Epochs, Loss)."
+
+testing:
+  layout:
+    - "tests/test_arima.py"
+    - "tests/test_lstm.py"
+    - "tests/test_hybrid_integration.py"
+  unitTests:
+    - id: UT1
+      description: "Verify ADF test correctly identifies non-stationary synthetic data."
+    - id: UT2
+      description: "Ensure LSTM output buffer matches the dimension of the ARIMA residual input."
+  integrationTests:
+    - id: IT1
+      description: "Walk-forward validation scenario: historic data -> ARIMA residuals -> LSTM training -> Final combined forecast."
+  acceptanceCriteria:
+    - "Hybrid model RMSE is lower than the standalone ARIMA benchmark."
+    - "Model successfully saves and loads training states/weights to .pkl or .h5 files."
+
+deliverables:
+  - "scripts/forecasting_hybrid.py"
+  - "tests/test_hybrid_integration.py"
+  - "config/model_params.yml"
+
+constraints:
+  - "The model must not violate temporal order (no data leakage)."
+  - "LSTM must use a doubled-hyperbolic tangent or appropriate activation to encompass the range of residual correlations [-2, 2]."
+
+# ------------------------------------------------------------------------
+# QUESTIONS FOR CLARIFICATION:
+# 1. What is the target timeframe for the crypto data (e.g., M5, H1, D1)?
+# 2. Are we forecasting the raw price values, returns, or correlation coefficients between asset pairs?
+# 3. Should the system support multivariate inputs (e.g., volume, RSI, MACD) in addition to closing prices?
+# ------------------------------------------------------------------------
+```

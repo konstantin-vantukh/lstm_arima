@@ -1,0 +1,6 @@
+## Created for LSTM-ARIMA implementation, not working
+## January 8th, 2026
+/__pycache__/
+/.pytest_cache/
+/src/__pycache__/
+/tests/__pycache__/

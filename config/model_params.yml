@@ -1,0 +1,29 @@
+# ARIMA Configuration
+arima:
+  seasonal: false
+  max_p: 5
+  max_d: 2
+  max_q: 5
+  information_criterion: aic
+
+# LSTM Configuration
+lstm:
+  hidden_layers: 1
+  nodes: 10
+  batch_size: 64
+  epochs: 100
+  dropout_rate: 0.4
+  l2_regularization: 0.01
+  window_size: 60
+  optimizer: adam
+  early_stopping_patience: 10
+
+# Validation Configuration
+validation:
+  method: walk_forward
+  test_size: 0.2
+
+# Hardware Configuration
+hardware:
+  use_opencl: true
+  gpu_memory_fraction: 0.8
