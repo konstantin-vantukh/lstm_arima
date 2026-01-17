@@ -21,7 +21,8 @@ from src.arima_engine import (
     test_stationarity,
     find_optimal_params,
     fit_arima,
-    extract_residuals
+    extract_residuals,
+    forecast_arima
 )
 
 
@@ -668,6 +669,106 @@ class TestARIMAErrorHandling:
 # ============================================================================
 # PARAMETRIZED TESTS
 # ============================================================================
+
+class TestForecastARIMA:
+    """
+    Test suite for ARIMA forecast generation.
+    """
+
+    def test_forecast_arima_basic(self, fitted_model_with_series: Tuple):
+        """
+        Verify basic ARIMA forecast generation.
+        """
+        series, model = fitted_model_with_series
+        horizon = 10
+        forecast = forecast_arima(model, horizon=horizon)
+        
+        # Verify forecast is numpy array
+        assert isinstance(forecast, np.ndarray), \
+            f"Forecast should be np.ndarray, got {type(forecast)}"
+        
+        # Verify forecast has correct length
+        assert len(forecast) == horizon, \
+            f"Forecast length ({len(forecast)}) should equal horizon ({horizon})"
+
+    def test_forecast_arima_different_horizons(self, fitted_model_with_series: Tuple):
+        """
+        Verify forecast works with different horizon values.
+        """
+        series, model = fitted_model_with_series
+        horizons = [1, 5, 10, 20]
+        
+        for horizon in horizons:
+            forecast = forecast_arima(model, horizon=horizon)
+            assert len(forecast) == horizon, \
+                f"Forecast length should match horizon for horizon={horizon}"
+
+    def test_forecast_arima_returns_array(self, fitted_model_with_series: Tuple):
+        """
+        Verify forecast returns numpy array.
+        """
+        series, model = fitted_model_with_series
+        forecast = forecast_arima(model, horizon=10)
+        
+        assert isinstance(forecast, np.ndarray), \
+            f"Forecast should be np.ndarray, got {type(forecast)}"
+
+    def test_forecast_arima_values_numeric(self, fitted_model_with_series: Tuple):
+        """
+        Verify forecast values are numeric and finite.
+        """
+        series, model = fitted_model_with_series
+        forecast = forecast_arima(model, horizon=10)
+        
+        # All values should be numeric
+        assert all(isinstance(v, (int, float, np.number)) for v in forecast), \
+            "All forecast values should be numeric"
+        
+        # All values should be finite
+        assert np.all(np.isfinite(forecast)), \
+            "All forecast values should be finite"
+
+    def test_forecast_arima_single_step(self, fitted_model_with_series: Tuple):
+        """
+        Verify forecast works for single-step ahead prediction.
+        """
+        series, model = fitted_model_with_series
+        forecast = forecast_arima(model, horizon=1)
+        
+        assert len(forecast) == 1, "Single step forecast should have length 1"
+        assert isinstance(forecast[0], (float, np.floating)), \
+            "Single forecast value should be numeric"
+
+    def test_forecast_arima_invalid_horizon_zero(self, fitted_model_with_series: Tuple):
+        """
+        Verify forecast raises error for zero horizon.
+        """
+        series, model = fitted_model_with_series
+        
+        with pytest.raises(ValueError):
+            forecast_arima(model, horizon=0)
+
+    def test_forecast_arima_invalid_horizon_negative(self, fitted_model_with_series: Tuple):
+        """
+        Verify forecast raises error for negative horizon.
+        """
+        series, model = fitted_model_with_series
+        
+        with pytest.raises(ValueError):
+            forecast_arima(model, horizon=-5)
+
+    def test_forecast_arima_in_returns_space(self, fitted_model_with_series: Tuple):
+        """
+        Verify forecast is in returns space (typically small values).
+        """
+        series, model = fitted_model_with_series
+        forecast = forecast_arima(model, horizon=10)
+        
+        # Returns are typically in range [-1, 1], though can be outside for extreme moves
+        # Just verify they're finite and reasonable (not nan/inf/massive values)
+        assert np.all(np.isfinite(forecast)), \
+            "Forecast values should be finite (representing returns)"
+
 
 class TestARIMAParametrized:
     """

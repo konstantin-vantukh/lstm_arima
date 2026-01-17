@@ -2,26 +2,517 @@
 Output Manager Module for Hybrid LSTM-ARIMA Forecasting System
 
 This module handles exporting results and reporting progress during the forecasting
-pipeline. It provides functionality to export predictions and metrics to CSV/JSON formats,
-log training progress to STDOUT, and generate human-readable forecast summaries.
+pipeline. It provides functionality to export predictions and metrics to CSV/JSON formats
+with dual-space output (returns and price space), log training progress to STDOUT, and
+generate human-readable forecast summaries.
+
+Key Features:
+    - Dual-space output: Returns-space and price-space forecasts in all exports
+    - CSV export with component breakdown
+    - JSON export with structured metadata
+    - STDOUT progress reporting
+    - Comprehensive error handling
+    - Path validation and directory creation
 
 Functions:
-    - export_results: Export results to CSV or JSON file
-    - log_progress: Log training progress to STDOUT
-    - format_results_summary: Create human-readable summary of forecast results
+    - export_to_csv: Export dual-space results to CSV
+    - export_to_json: Export dual-space results to JSON
+    - export_to_stdout: Print human-readable summary to console
+    - log_progress: Log progress with structured logging
+    - validate_output_path: Validate and create output directories
+    - export_results: Main export function (legacy compatibility)
+    - log_progress: (legacy compatibility)
+    - format_results_summary: Create human-readable summary
+
+Error Handling & Logging: Section 10, Error Handling Strategy
 """
 
 import logging
 import json
 import csv
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, List, Any, Optional, Union, Tuple
 from datetime import datetime
+import numpy as np
 
-# Configure logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+from src.exceptions import FileIOError
+from src.logger_config import get_logger, log_exception
 
+# Configure module logging
+logger = get_logger(__name__)
+
+
+# ============================================================================
+# DUAL-SPACE OUTPUT FUNCTIONS (ARCHITECTURE 9.2)
+# ============================================================================
+
+def validate_output_path(output_path: str) -> bool:
+    """
+    Validate and prepare output directory for file writing.
+    
+    Ensures the output directory exists and is writable. Creates parent 
+    directories if needed using mkdir with parents=True.
+    
+    Args:
+        output_path (str): Full file path where output will be written.
+            Can be absolute or relative path.
+    
+    Returns:
+        bool: True if directory is valid/created and writable, False otherwise.
+    
+    Raises:
+        None - logs errors instead of raising
+    
+    Examples:
+        >>> is_valid = validate_output_path("output/forecast.csv")
+        >>> if is_valid:
+        ...     print("Output path ready")
+    """
+    try:
+        file_path = Path(output_path)
+        parent_dir = file_path.parent
+        
+        # Create parent directories
+        parent_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Check write permissions by testing with parent directory
+        if not parent_dir.exists():
+            logger.error(f"Failed to create output directory: {parent_dir}")
+            return False
+        
+        # Verify write permission
+        try:
+            test_file = parent_dir / ".write_test_tmp"
+            test_file.touch()
+            test_file.unlink()
+        except (PermissionError, OSError) as e:
+            logger.error(f"No write permission for directory {parent_dir}: {str(e)}")
+            return False
+        
+        logger.info(f"Output path validated: {parent_dir}")
+        return True
+    
+    except Exception as e:
+        logger.error(f"Error validating output path {output_path}: {str(e)}")
+        return False
+
+
+def export_to_csv(
+    output_path: str,
+    predictions_returns: Union[np.ndarray, List],
+    predictions_price: Union[np.ndarray, List],
+    arima_component: Union[np.ndarray, List],
+    lstm_component: Union[np.ndarray, List],
+    metrics_returns: Optional[Dict[str, float]] = None,
+    metrics_price: Optional[Dict[str, float]] = None
+) -> None:
+    """
+    Export dual-space forecasts and components to CSV file.
+    
+    Creates a CSV file with columns for returns-space and price-space predictions,
+    along with ARIMA and LSTM component breakdowns. Optionally includes metrics
+    as summary rows at the end.
+    
+    CSV Format (from architecture 9.2):
+        timestamp,prediction_returns,prediction_price,arima_component,lstm_component
+        t1,0.0125,50125.50,0.0100,0.0025
+        t2,0.0089,50570.25,0.0080,-0.0009
+        t3,-0.0034,50296.18,-0.0045,0.0011
+    
+    Args:
+        output_path (str): File path where CSV will be written.
+        predictions_returns (np.ndarray or list): Forecast values in returns space.
+        predictions_price (np.ndarray or list): Forecast values in price space.
+        arima_component (np.ndarray or list): ARIMA linear predictions (returns space).
+        lstm_component (np.ndarray or list): LSTM residual predictions (returns space).
+        metrics_returns (dict, optional): Metrics in returns space with keys 'rmse', 'mae'.
+        metrics_price (dict, optional): Metrics in price space with keys 'rmse', 'mae'.
+    
+    Returns:
+        None
+    
+    Raises:
+        IOError: If file write fails
+        ValueError: If input arrays have mismatched lengths
+    
+    Examples:
+        >>> import numpy as np
+        >>> preds_ret = np.array([0.0125, 0.0089, -0.0034])
+        >>> preds_price = np.array([50125.50, 50570.25, 50296.18])
+        >>> arima = np.array([0.0100, 0.0080, -0.0045])
+        >>> lstm = np.array([0.0025, -0.0009, 0.0011])
+        >>> export_to_csv("output/forecast.csv", preds_ret, preds_price, arima, lstm)
+    """
+    try:
+        # Validate inputs
+        if not validate_output_path(output_path):
+            raise IOError(f"Failed to validate output path: {output_path}")
+        
+        # Convert numpy arrays to lists
+        if hasattr(predictions_returns, 'tolist'):
+            predictions_returns = predictions_returns.tolist()
+        if hasattr(predictions_price, 'tolist'):
+            predictions_price = predictions_price.tolist()
+        if hasattr(arima_component, 'tolist'):
+            arima_component = arima_component.tolist()
+        if hasattr(lstm_component, 'tolist'):
+            lstm_component = lstm_component.tolist()
+        
+        # Validate array lengths match
+        n_predictions = len(predictions_returns)
+        if not (len(predictions_price) == n_predictions and 
+                len(arima_component) == n_predictions and 
+                len(lstm_component) == n_predictions):
+            error_msg = (f"Input arrays have mismatched lengths: "
+                        f"returns={len(predictions_returns)}, "
+                        f"price={len(predictions_price)}, "
+                        f"arima={len(arima_component)}, "
+                        f"lstm={len(lstm_component)}")
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        # Write CSV file
+        file_path = Path(output_path)
+        with open(file_path, 'w', newline='', encoding='utf-8') as f:
+            fieldnames = ['timestamp', 'prediction_returns', 'prediction_price', 
+                         'arima_component', 'lstm_component']
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            
+            # Write header
+            writer.writeheader()
+            
+            # Write data rows
+            for i in range(n_predictions):
+                row = {
+                    'timestamp': f"t{i+1}",
+                    'prediction_returns': predictions_returns[i],
+                    'prediction_price': predictions_price[i],
+                    'arima_component': arima_component[i],
+                    'lstm_component': lstm_component[i]
+                }
+                writer.writerow(row)
+            
+            # Write metrics as summary rows if provided
+            if metrics_returns or metrics_price:
+                f.write("\n# Metrics Summary\n")
+                
+                if metrics_returns:
+                    f.write("# Metrics (Returns Space)\n")
+                    for metric_name, metric_value in metrics_returns.items():
+                        f.write(f"# {metric_name}: {metric_value}\n")
+                
+                if metrics_price:
+                    f.write("# Metrics (Price Space)\n")
+                    for metric_name, metric_value in metrics_price.items():
+                        f.write(f"# {metric_name}: {metric_value}\n")
+        
+        logger.info(f"CSV export successful: {file_path} ({n_predictions} predictions)")
+    
+    except (IOError, ValueError) as e:
+        logger.error(f"Error in export_to_csv: {str(e)}")
+        log_exception(logger, e)
+        raise FileIOError(
+            error_message=f"CSV export failed: {str(e)}",
+            file_path=output_path,
+            operation="write"
+        ) from e
+    except Exception as e:
+        error_msg = f"Unexpected error during CSV export: {str(e)}"
+        logger.error(error_msg)
+        log_exception(logger, e)
+        raise FileIOError(
+            error_message=error_msg,
+            file_path=output_path,
+            operation="write"
+        ) from e
+
+
+def export_to_json(
+    output_path: str,
+    ticker: str,
+    horizon: int,
+    predictions_returns: Union[np.ndarray, List],
+    predictions_price: Union[np.ndarray, List],
+    arima_component: Union[np.ndarray, List],
+    lstm_component: Union[np.ndarray, List],
+    metrics_returns: Optional[Dict[str, float]] = None,
+    metrics_price: Optional[Dict[str, float]] = None,
+    model_params: Optional[Dict[str, Any]] = None
+) -> None:
+    """
+    Export dual-space forecasts and metadata to JSON file.
+    
+    Creates a JSON file with complete forecasting results including predictions
+    in both spaces, components, metrics, and model parameters. Uses ISO 8601
+    format for timestamps.
+    
+    JSON Format (from architecture 9.2):
+    {
+      "timestamp": "2026-01-15T08:00:00",
+      "ticker": "BTC",
+      "horizon": 10,
+      "predictions_returns": [0.0125, 0.0089, -0.0034, ...],
+      "predictions_price": [50125.50, 50570.25, 50296.18, ...],
+      "arima_component": [0.0100, 0.0080, -0.0045, ...],
+      "lstm_component": [0.0025, -0.0009, 0.0011, ...],
+      "metrics_returns": {"rmse": 0.0045, "mae": 0.0032},
+      "metrics_price": {"rmse": 225.50, "mae": 160.25},
+      "model_params": {"arima_order": [1, 1, 1], "last_price": 50000.00}
+    }
+    
+    Args:
+        output_path (str): File path where JSON will be written.
+        ticker (str): Asset ticker symbol (e.g., 'BTC', 'ETH').
+        horizon (int): Forecast horizon (number of periods).
+        predictions_returns (np.ndarray or list): Forecast values in returns space.
+        predictions_price (np.ndarray or list): Forecast values in price space.
+        arima_component (np.ndarray or list): ARIMA linear predictions (returns space).
+        lstm_component (np.ndarray or list): LSTM residual predictions (returns space).
+        metrics_returns (dict, optional): Metrics in returns space with 'rmse', 'mae'.
+        metrics_price (dict, optional): Metrics in price space with 'rmse', 'mae'.
+        model_params (dict, optional): Model parameters including 'arima_order', 'last_price'.
+    
+    Returns:
+        None
+    
+    Raises:
+        IOError: If file write fails
+        ValueError: If input arrays have mismatched lengths or invalid ticker/horizon
+    
+    Examples:
+        >>> import numpy as np
+        >>> preds_ret = np.array([0.0125, 0.0089])
+        >>> preds_price = np.array([50125.50, 50570.25])
+        >>> arima = np.array([0.0100, 0.0080])
+        >>> lstm = np.array([0.0025, -0.0009])
+        >>> export_to_json("output/forecast.json", "BTC", 2, 
+        ...                preds_ret, preds_price, arima, lstm)
+    """
+    try:
+        # Validate inputs
+        if not validate_output_path(output_path):
+            raise IOError(f"Failed to validate output path: {output_path}")
+        
+        if not isinstance(ticker, str) or len(ticker) == 0:
+            raise ValueError(f"ticker must be non-empty string, got {ticker}")
+        
+        if not isinstance(horizon, int) or horizon <= 0:
+            raise ValueError(f"horizon must be positive integer, got {horizon}")
+        
+        # Convert numpy arrays to lists
+        if hasattr(predictions_returns, 'tolist'):
+            predictions_returns = predictions_returns.tolist()
+        if hasattr(predictions_price, 'tolist'):
+            predictions_price = predictions_price.tolist()
+        if hasattr(arima_component, 'tolist'):
+            arima_component = arima_component.tolist()
+        if hasattr(lstm_component, 'tolist'):
+            lstm_component = lstm_component.tolist()
+        
+        # Validate array lengths match
+        n_predictions = len(predictions_returns)
+        if not (len(predictions_price) == n_predictions and 
+                len(arima_component) == n_predictions and 
+                len(lstm_component) == n_predictions):
+            error_msg = (f"Input arrays have mismatched lengths: "
+                        f"returns={len(predictions_returns)}, "
+                        f"price={len(predictions_price)}, "
+                        f"arima={len(arima_component)}, "
+                        f"lstm={len(lstm_component)}")
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        # Build JSON structure
+        json_data = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "ticker": ticker,
+            "horizon": horizon,
+            "predictions_returns": predictions_returns,
+            "predictions_price": predictions_price,
+            "arima_component": arima_component,
+            "lstm_component": lstm_component
+        }
+        
+        # Add optional metrics
+        if metrics_returns:
+            json_data["metrics_returns"] = metrics_returns
+        if metrics_price:
+            json_data["metrics_price"] = metrics_price
+        
+        # Add optional model parameters
+        if model_params:
+            json_data["model_params"] = model_params
+        
+        # Write JSON file
+        file_path = Path(output_path)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump(json_data, f, indent=2, allow_nan=True)
+        
+        logger.info(f"JSON export successful: {file_path} ({n_predictions} predictions)")
+    
+    except (IOError, ValueError) as e:
+        logger.error(f"Error in export_to_json: {str(e)}")
+        log_exception(logger, e)
+        raise FileIOError(
+            error_message=f"JSON export failed: {str(e)}",
+            file_path=output_path,
+            operation="write"
+        ) from e
+    except Exception as e:
+        error_msg = f"Unexpected error during JSON export: {str(e)}"
+        logger.error(error_msg)
+        log_exception(logger, e)
+        raise FileIOError(
+            error_message=error_msg,
+            file_path=output_path,
+            operation="write"
+        ) from e
+
+
+def export_to_stdout(
+    predictions_returns: Union[np.ndarray, List],
+    predictions_price: Union[np.ndarray, List],
+    metrics_returns: Optional[Dict[str, float]] = None,
+    metrics_price: Optional[Dict[str, float]] = None
+) -> None:
+    """
+    Print human-readable summary of dual-space forecasts to console.
+    
+    Displays first and last few predictions in both returns and price space,
+    along with metrics summary if provided. Useful for progress reporting
+    during forecasting.
+    
+    Args:
+        predictions_returns (np.ndarray or list): Forecast values in returns space.
+        predictions_price (np.ndarray or list): Forecast values in price space.
+        metrics_returns (dict, optional): Metrics in returns space.
+        metrics_price (dict, optional): Metrics in price space.
+    
+    Returns:
+        None
+    
+    Examples:
+        >>> import numpy as np
+        >>> preds_ret = np.array([0.0125, 0.0089, -0.0034, 0.0045, 0.0067])
+        >>> preds_price = np.array([50125.50, 50570.25, 50296.18, 50518.42, 50850.99])
+        >>> export_to_stdout(preds_ret, preds_price)
+        
+        >>> # With metrics
+        >>> metrics_r = {"rmse": 0.0045, "mae": 0.0032}
+        >>> metrics_p = {"rmse": 225.50, "mae": 160.25}
+        >>> export_to_stdout(preds_ret, preds_price, metrics_r, metrics_p)
+    """
+    try:
+        # Convert numpy arrays to lists
+        if hasattr(predictions_returns, 'tolist'):
+            predictions_returns = predictions_returns.tolist()
+        if hasattr(predictions_price, 'tolist'):
+            predictions_price = predictions_price.tolist()
+        
+        n_predictions = len(predictions_returns)
+        
+        # Print header
+        print("\n" + "=" * 80)
+        print("HYBRID LSTM-ARIMA FORECAST - DUAL-SPACE PREDICTIONS")
+        print("=" * 80)
+        
+        # Show first few predictions
+        n_show = min(3, n_predictions)
+        print(f"\nFirst {n_show} Predictions:")
+        print("-" * 80)
+        print(f"{'Index':<8} {'Returns':<18} {'Price':<18}")
+        print("-" * 80)
+        for i in range(n_show):
+            print(f"t{i+1:<7} {predictions_returns[i]:<18.6f} {predictions_price[i]:<18.2f}")
+        
+        # Show last few predictions if different
+        if n_predictions > n_show:
+            start_idx = max(n_show, n_predictions - n_show)
+            print(f"\nLast {n_predictions - start_idx} Predictions:")
+            print("-" * 80)
+            print(f"{'Index':<8} {'Returns':<18} {'Price':<18}")
+            print("-" * 80)
+            for i in range(start_idx, n_predictions):
+                print(f"t{i+1:<7} {predictions_returns[i]:<18.6f} {predictions_price[i]:<18.2f}")
+        
+        # Print summary statistics
+        print("\n" + "-" * 80)
+        print("FORECAST SUMMARY")
+        print("-" * 80)
+        print(f"Total Predictions: {n_predictions}")
+        print(f"Returns Range: [{min(predictions_returns):.6f}, {max(predictions_returns):.6f}]")
+        print(f"Price Range: [{min(predictions_price):.2f}, {max(predictions_price):.2f}]")
+        
+        # Print metrics if provided
+        if metrics_returns or metrics_price:
+            print("\n" + "-" * 80)
+            print("PERFORMANCE METRICS")
+            print("-" * 80)
+            
+            if metrics_returns:
+                print("Returns Space:")
+                for metric_name, metric_value in metrics_returns.items():
+                    print(f"  {metric_name.upper():<12}: {metric_value:.6f}")
+            
+            if metrics_price:
+                print("Price Space:")
+                for metric_name, metric_value in metrics_price.items():
+                    print(f"  {metric_name.upper():<12}: {metric_value:.2f}")
+        
+        print("\n" + "=" * 80 + "\n")
+        logger.info("STDOUT export completed")
+    
+    except Exception as e:
+        logger.error(f"Error in export_to_stdout: {str(e)}")
+        raise
+
+
+def log_progress(message: str, level: str = 'INFO') -> None:
+    """
+    Log structured progress messages with configurable log level.
+    
+    Provides unified logging for progress reporting during model training and
+    forecasting. Supports both INFO and WARNING levels. Uses Python's logging
+    module for proper timestamp and source tracking.
+    
+    Args:
+        message (str): Progress message to log.
+        level (str): Log level - 'INFO' or 'WARNING'. Default: 'INFO'
+    
+    Returns:
+        None
+    
+    Raises:
+        ValueError: If level not in ['INFO', 'WARNING']
+        TypeError: If message is not a string
+    
+    Examples:
+        >>> log_progress("Starting ARIMA model fitting")
+        >>> log_progress("GPU memory warning", level='WARNING')
+        >>> log_progress("Hybrid model forecast complete")
+    """
+    try:
+        # Validate inputs
+        if not isinstance(message, str):
+            raise TypeError(f"message must be string, got {type(message)}")
+        
+        if level not in ('INFO', 'WARNING'):
+            raise ValueError(f"level must be 'INFO' or 'WARNING', got '{level}'")
+        
+        # Log with appropriate level
+        if level == 'INFO':
+            logger.info(message)
+        elif level == 'WARNING':
+            logger.warning(message)
+    
+    except (TypeError, ValueError) as e:
+        logger.error(f"Error in log_progress: {str(e)}")
+        raise
+
+
+# ============================================================================
+# LEGACY EXPORT FUNCTIONS (BACKWARD COMPATIBILITY)
+# ============================================================================
 
 def export_results(
     results: dict,
@@ -231,13 +722,13 @@ def _export_to_csv(data: dict, file_path: Path) -> None:
         raise IOError(error_msg) from e
 
 
-def log_progress(
+def log_epoch_progress(
     epoch: int,
     loss: float,
     stage: str = 'training'
 ) -> None:
     """
-    Log training progress to STDOUT.
+    Log training progress to STDOUT (Legacy compatibility function).
 
     Reports model training progress including epoch number, loss value, and training
     stage. Output goes to standard output stream for real-time monitoring of training.
@@ -260,15 +751,11 @@ def log_progress(
         ValueError: If epoch is negative.
 
     Examples:
-        >>> log_progress(1, 0.5234567, stage='training')
+        >>> log_epoch_progress(1, 0.5234567, stage='training')
         >>> # Output to STDOUT: [Epoch 1 | training] Loss: 0.523457
 
-        >>> log_progress(10, 0.0987654, stage='validation')
+        >>> log_epoch_progress(10, 0.0987654, stage='validation')
         >>> # Output to STDOUT: [Epoch 10 | validation] Loss: 0.098765
-
-        >>> for epoch in range(1, 6):
-        ...     loss = 0.5 / (epoch + 1)
-        ...     log_progress(epoch, loss)
     """
     try:
         # Validate epoch parameter
@@ -304,7 +791,7 @@ def log_progress(
         logger.info(f"Progress logged: {progress_msg}")
 
     except (TypeError, ValueError) as e:
-        logger.error(f"Error in log_progress: {str(e)}")
+        logger.error(f"Error in log_epoch_progress: {str(e)}")
         raise
 
 
@@ -466,3 +953,30 @@ def format_results_summary(results: dict) -> str:
     except (TypeError, ValueError) as e:
         logger.error(f"Error in format_results_summary: {str(e)}")
         raise
+
+def report_progress(current_step: int, total_steps: int, message: Optional[str] = None) -> None:
+    """
+    Reports progress to the console with a progress indicator.
+
+    Args:
+        current_step (int): Current step number.
+        total_steps (int): Total number of steps.
+        message (str, optional): Additional message to display. Defaults to None.
+    """
+    if current_step <= 0 or total_steps <= 0:
+        logger.warning(f"Invalid progress values: current_step={current_step}, total_steps={total_steps}")
+        return
+    
+    percentage = min(100, int((current_step / total_steps) * 100))
+    bar_length = 40
+    filled = int(bar_length * current_step / total_steps)
+    bar = '█' * filled + '░' * (bar_length - filled)
+    
+    progress_str = f"\rProgress: [{bar}] {percentage}% ({current_step}/{total_steps})"
+    if message:
+        progress_str += f" - {message}"
+    
+    print(progress_str, end='', flush=True)
+    
+    if current_step == total_steps:
+        print()  # New line at end

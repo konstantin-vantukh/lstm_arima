@@ -2,51 +2,63 @@
 Hybrid Combiner Module for Hybrid LSTM-ARIMA Forecasting System
 
 This module handles the combination of ARIMA linear forecasts with LSTM residual
-forecasts to produce final hybrid predictions. It implements the combination formula:
-ŷ_t = L̂_t + N̂_t
+forecasts to produce final hybrid predictions in RETURNS SPACE. It implements the
+combination formula:
+
+R̂_t = L̂_t + N̂_t
 
 Where:
-- ŷ_t = Final hybrid forecast
-- L̂_t = ARIMA linear prediction
-- N̂_t = LSTM residual prediction
+- R̂_t = Final hybrid returns forecast (in RETURNS SPACE)
+- L̂_t = ARIMA linear prediction (in RETURNS SPACE)
+- N̂_t = LSTM residual prediction (in RETURNS SPACE)
+
+All predictions are in RETURNS SPACE (percentage changes).
 
 Functions:
-    - combine_predictions: Combine linear and non-linear components with alignment
-    - get_component_details: Extract component statistics and contributions
+    - combine_forecasts: Combine linear and non-linear components in returns space
+    - get_hybrid_component_breakdown: Extract component statistics and contributions
+    - combine_predictions: DEPRECATED - use combine_forecasts()
+    - get_component_details: DEPRECATED - use get_hybrid_component_breakdown()
+
+Error Handling & Logging: Section 10, Error Handling Strategy
 """
 
 import logging
 import numpy as np
 from typing import Tuple, Dict, Any
 
-
-# Configure logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+from src.exceptions import DataValidationError
+from src.logger_config import get_logger, log_exception
 
 
-def combine_predictions(
+# Configure module logging
+logger = get_logger(__name__)
+
+
+def combine_forecasts(
     arima_forecast: np.ndarray,
-    lstm_residual_forecast: np.ndarray
+    lstm_forecast: np.ndarray
 ) -> Dict[str, Any]:
     """
-    Combine ARIMA linear predictions with LSTM residual predictions.
+    Combine ARIMA linear forecasts with LSTM residual forecasts (returns space).
 
-    Implements the hybrid forecasting formula ŷ_t = L̂_t + N̂_t by adding the
-    ARIMA linear component (L̂_t) and LSTM non-linear residual component (N̂_t).
-    Handles alignment of predictions that may have different lengths due to
-    ARIMA and LSTM processing differences.
+    Implements the hybrid forecasting formula R̂_t = L̂_t + N̂_t where:
+    - R̂_t = Final hybrid returns forecast (in RETURNS SPACE)
+    - L̂_t = ARIMA linear prediction (in RETURNS SPACE)
+    - N̂_t = LSTM residual prediction (in RETURNS SPACE)
+
+    Both inputs and output are in RETURNS SPACE (percentage changes).
 
     Args:
         arima_forecast (np.ndarray): ARIMA linear predictions array.
-            Shape: (n_steps,) - 1D array of ARIMA forecast values
-        lstm_residual_forecast (np.ndarray): LSTM residual predictions array.
-            Shape: (m_steps,) - 1D array of LSTM residual forecast values
+            Shape: (n_steps,) - 1D array of ARIMA forecast values (returns space)
+        lstm_forecast (np.ndarray): LSTM residual predictions array.
+            Shape: (m_steps,) - 1D array of LSTM residual forecast values (returns space)
             Note: May differ in length from arima_forecast due to LSTM window preprocessing
 
     Returns:
         Dict[str, Any]: Standardized result dictionary containing:
-            - predictions (np.ndarray): Combined hybrid forecast array
+            - predictions (np.ndarray): Combined hybrid forecast array (returns space)
                 Shape: (aligned_steps,) - Same length as shorter input array
             - arima_component (np.ndarray): Linear ARIMA component (L̂_t)
                 Shape: (aligned_steps,)
@@ -70,11 +82,11 @@ def combine_predictions(
         TypeError: If inputs are not numpy arrays or not numeric types
 
     Examples:
-        >>> arima_pred = np.array([100.5, 101.2, 102.1])
-        >>> lstm_pred = np.array([0.5, -0.3, 0.2])
-        >>> result = combine_predictions(arima_pred, lstm_pred)
+        >>> arima_pred = np.array([0.01, 0.02, 0.015])  # returns space
+        >>> lstm_pred = np.array([0.002, -0.001, 0.003])  # returns space
+        >>> result = combine_forecasts(arima_pred, lstm_pred)
         >>> print(result['predictions'])
-        [101.0, 100.9, 102.3]
+        [0.012, 0.019, 0.018]
         >>> print(result['component_stats']['arima_contribution'])
         95.5
 
@@ -83,6 +95,7 @@ def combine_predictions(
         - Component contributions are calculated as percentage of total variance
         - All input arrays must be 1D numeric arrays
         - NaN and inf values are not allowed in input arrays
+        - All values are in RETURNS SPACE (percentage changes)
     """
     # Input validation - type checks
     if not isinstance(arima_forecast, np.ndarray):
@@ -90,8 +103,8 @@ def combine_predictions(
         logger.error(error_msg)
         raise TypeError(error_msg)
 
-    if not isinstance(lstm_residual_forecast, np.ndarray):
-        error_msg = f"lstm_residual_forecast must be numpy array, got {type(lstm_residual_forecast)}"
+    if not isinstance(lstm_forecast, np.ndarray):
+        error_msg = f"lstm_forecast must be numpy array, got {type(lstm_forecast)}"
         logger.error(error_msg)
         raise TypeError(error_msg)
 
@@ -101,8 +114,8 @@ def combine_predictions(
         logger.error(error_msg)
         raise TypeError(error_msg)
 
-    if not np.issubdtype(lstm_residual_forecast.dtype, np.number):
-        error_msg = f"lstm_residual_forecast must contain numeric values, got dtype {lstm_residual_forecast.dtype}"
+    if not np.issubdtype(lstm_forecast.dtype, np.number):
+        error_msg = f"lstm_forecast must contain numeric values, got dtype {lstm_forecast.dtype}"
         logger.error(error_msg)
         raise TypeError(error_msg)
 
@@ -112,8 +125,8 @@ def combine_predictions(
         logger.error(error_msg)
         raise ValueError(error_msg)
 
-    if lstm_residual_forecast.ndim != 1:
-        error_msg = f"lstm_residual_forecast must be 1D array, got shape {lstm_residual_forecast.shape}"
+    if lstm_forecast.ndim != 1:
+        error_msg = f"lstm_forecast must be 1D array, got shape {lstm_forecast.shape}"
         logger.error(error_msg)
         raise ValueError(error_msg)
 
@@ -123,8 +136,8 @@ def combine_predictions(
         logger.error(error_msg)
         raise ValueError(error_msg)
 
-    if len(lstm_residual_forecast) == 0:
-        error_msg = "lstm_residual_forecast is empty"
+    if len(lstm_forecast) == 0:
+        error_msg = "lstm_forecast is empty"
         logger.error(error_msg)
         raise ValueError(error_msg)
 
@@ -134,19 +147,19 @@ def combine_predictions(
         logger.error(error_msg)
         raise ValueError(error_msg)
 
-    if np.isnan(lstm_residual_forecast).any() or np.isinf(lstm_residual_forecast).any():
-        error_msg = "lstm_residual_forecast contains NaN or inf values"
+    if np.isnan(lstm_forecast).any() or np.isinf(lstm_forecast).any():
+        error_msg = "lstm_forecast contains NaN or inf values"
         logger.error(error_msg)
         raise ValueError(error_msg)
 
     try:
         logger.info(
             f"Combining predictions: arima_shape={arima_forecast.shape}, "
-            f"lstm_shape={lstm_residual_forecast.shape}"
+            f"lstm_shape={lstm_forecast.shape}"
         )
 
         original_arima_length = len(arima_forecast)
-        original_lstm_length = len(lstm_residual_forecast)
+        original_lstm_length = len(lstm_forecast)
 
         # Align predictions to shorter length to avoid index mismatch
         # This handles cases where ARIMA and LSTM processing produce different lengths
@@ -158,7 +171,7 @@ def combine_predictions(
 
         # Trim arrays to aligned length
         arima_aligned = arima_forecast[:aligned_length]
-        lstm_aligned = lstm_residual_forecast[:aligned_length]
+        lstm_aligned = lstm_forecast[:aligned_length]
 
         # Combine predictions using hybrid formula: ŷ_t = L̂_t + N̂_t
         combined_predictions = arima_aligned + lstm_aligned
@@ -230,23 +243,28 @@ def combine_predictions(
     except (ValueError, TypeError) as e:
         error_msg = f"Input validation failed during prediction combination: {str(e)}"
         logger.error(error_msg)
-        raise
+        log_exception(logger, e)
+        raise DataValidationError(
+            error_message=error_msg,
+            data_shape=(len(arima_forecast), len(lstm_forecast))
+        ) from e
     except Exception as e:
         error_msg = f"Failed to combine predictions: {str(e)}"
         logger.error(error_msg)
+        log_exception(logger, e)
         raise
 
 
-def get_component_details(
+def get_hybrid_component_breakdown(
     arima_component: np.ndarray,
     lstm_component: np.ndarray
 ) -> Dict[str, Any]:
     """
-    Extract detailed statistics on component contributions to the hybrid forecast.
+    Extract detailed breakdown of component contributions to the hybrid forecast.
 
     Analyzes the ARIMA linear and LSTM non-linear components to provide
     comprehensive statistics on their individual contributions, relationships,
-    and impact on the final hybrid prediction.
+    and impact on the final hybrid forecast (R̂_t = L̂_t + N̂_t).
 
     Args:
         arima_component (np.ndarray): ARIMA linear predictions array.
@@ -489,8 +507,55 @@ def get_component_details(
     except (ValueError, TypeError) as e:
         error_msg = f"Input validation failed during component detail extraction: {str(e)}"
         logger.error(error_msg)
-        raise
+        log_exception(logger, e)
+        raise DataValidationError(
+            error_message=error_msg,
+            data_shape=(len(arima_component), len(lstm_component))
+        ) from e
     except Exception as e:
         error_msg = f"Failed to extract component details: {str(e)}"
         logger.error(error_msg)
+        log_exception(logger, e)
         raise
+
+
+# ============================================================================
+# BACKWARD COMPATIBILITY WRAPPERS
+# ============================================================================
+
+
+def combine_predictions(
+    arima_forecast: np.ndarray,
+    lstm_residual_forecast: np.ndarray
+) -> Dict[str, Any]:
+    """
+    DEPRECATED: Use combine_forecasts() instead.
+
+    This function is a backward-compatibility wrapper for combine_forecasts().
+    It maintains the old function name and parameter names for existing code.
+
+    See combine_forecasts() for full documentation.
+    """
+    logger.warning(
+        "combine_predictions() is deprecated. Use combine_forecasts() instead. "
+        "Parameter 'lstm_residual_forecast' has been renamed to 'lstm_forecast'."
+    )
+    return combine_forecasts(arima_forecast, lstm_residual_forecast)
+
+
+def get_component_details(
+    arima_component: np.ndarray,
+    lstm_component: np.ndarray
+) -> Dict[str, Any]:
+    """
+    DEPRECATED: Use get_hybrid_component_breakdown() instead.
+
+    This function is a backward-compatibility wrapper for get_hybrid_component_breakdown().
+    It maintains the old function name for existing code.
+
+    See get_hybrid_component_breakdown() for full documentation.
+    """
+    logger.warning(
+        "get_component_details() is deprecated. Use get_hybrid_component_breakdown() instead."
+    )
+    return get_hybrid_component_breakdown(arima_component, lstm_component)

@@ -4,18 +4,31 @@
 
 This document describes the software architecture for a **Hybrid LSTM-ARIMA Command-Line Interface (CLI) Forecasting System** designed for cryptocurrency time series prediction. The system combines traditional statistical modeling (ARIMA) for linear components with deep learning (LSTM) for non-linear residual patterns.
 
+The system operates in a **dual-space architecture**:
+- **Input Space:** Raw price data (P_t)
+- **Processing Space:** Returns space (R_t) - all internal computations
+- **Output Space:** Dual outputs - both returns-space and reconstructed price-space forecasts
+
+This dual-space approach provides flexibility: users can work with scale-free returns data for comparative analysis while also obtaining economically intuitive price-space predictions.
+
 ### 1.1 Core Assumption
 
-The system models a time series *x_t* as:
+The system models a time series in returns space as:
 
 ```
-x_t = L_t + N_t + ε_t
+R_t = L_t + N_t + ε_t
 ```
 
 Where:
+- **R_t** = Observed returns at time t
 - **L_t** = Linear component (captured by ARIMA)
 - **N_t** = Non-linear component (captured by LSTM)
 - **ε_t** = Random error term
+
+The final forecasts are then provided in two formats:
+
+1. **Returns-space forecast:** R̂_t (intermediate output)
+2. **Price-space forecast:** P̂_t reconstructed using inverse formula
 
 ---
 
@@ -28,23 +41,30 @@ flowchart TB
         B --> C{Input Validation}
     end
 
-    subgraph Core[Core Processing Pipeline]
-        D[Data Loader] --> E[Preprocessor]
-        E --> F[ARIMA Module]
-        F --> G[Residual Extractor]
-        G --> H[LSTM Module]
-        H --> I[Hybrid Combiner]
+    subgraph Core[Core Processing Pipeline - Returns Space]
+        D[Data Loader - Price Data] --> E[Preprocessor]
+        E --> F[Calculate Returns]
+        F --> G[ARIMA Module]
+        G --> H[Residual Extractor]
+        H --> I[LSTM Module]
+        I --> J[Hybrid Combiner - Returns]
+    end
+
+    subgraph PriceReconst[Price-Space Reconstruction]
+        J --> K[Price Converter]
+        K --> L[Hybrid Combiner - Price]
     end
 
     subgraph Output[Output Layer]
-        I --> J[Metrics Calculator]
-        J --> K[Results Exporter]
+        J --> M[Metrics Calculator]
+        L --> M
+        M --> N[Results Exporter]
     end
 
     C -->|Valid| D
-    C -->|Invalid| L[Error Handler]
-    K --> M[CSV/JSON Output]
-    K --> N[STDOUT Progress]
+    C -->|Invalid| O[Error Handler]
+    N --> P[CSV/JSON Output - Dual Space]
+    N --> Q[STDOUT Progress]
 ```
 
 ---
@@ -61,6 +81,8 @@ flowchart LR
         DP[Data Preprocessor]
         ARIMA[ARIMA Engine]
         LSTM[LSTM Engine]
+        HC[Hybrid Combiner]
+        PC[Price Converter]
         EVAL[Evaluation Module]
         OUT[Output Manager]
     end
@@ -68,7 +90,9 @@ flowchart LR
     CLI --> DP
     DP --> ARIMA
     ARIMA --> LSTM
-    LSTM --> EVAL
+    LSTM --> HC
+    HC --> PC
+    PC --> EVAL
     EVAL --> OUT
 ```
 
@@ -77,11 +101,13 @@ flowchart LR
 | Component | Responsibility | Key Dependencies |
 |-----------|----------------|------------------|
 | CLI Interface | Parse arguments, validate inputs, orchestrate workflow | argparse/click |
-| Data Preprocessor | Load data, impute missing values, calculate returns, reshape tensors | pandas, numpy |
-| ARIMA Engine | Stationarity testing, auto-parameter selection, linear forecasting | statsmodels |
-| LSTM Engine | Non-linear residual modeling, sequential pattern learning | tensorflow, keras |
-| Evaluation Module | Calculate RMSE/MAE, walk-forward validation | numpy, sklearn |
-| Output Manager | Export results to CSV/JSON, progress reporting | json, csv |
+| Data Preprocessor | Load price data, impute missing values, calculate returns | pandas, numpy |
+| ARIMA Engine | Stationarity testing, auto-parameter selection, linear forecasting in returns space | statsmodels |
+| LSTM Engine | Non-linear residual modeling in returns space, sequential pattern learning | tensorflow, keras |
+| Hybrid Combiner | Combine ARIMA and LSTM components in returns space | numpy |
+| Price Converter | Reconstruct forecasts from returns-space to price-space | numpy |
+| Evaluation Module | Calculate RMSE/MAE in both spaces, walk-forward validation | numpy, sklearn |
+| Output Manager | Export dual-space results to CSV/JSON, progress reporting | json, csv |
 
 ---
 
@@ -98,7 +124,7 @@ flowchart TD
     C -->|Valid| D[Initialize Pipeline]
     C -->|Invalid| E[Display Error and Exit]
     D --> F[Execute Forecast]
-    F --> G[Export Results]
+    F --> G[Export Results - Dual Space]
     G --> H[End]
 ```
 
@@ -106,7 +132,7 @@ flowchart TD
 
 | Argument | Type | Required | Description |
 |----------|------|----------|-------------|
-| `--input` | string | Yes | Path to input file - CSV or JSON |
+| `--input` | string | Yes | Path to input file - CSV or JSON containing price data |
 | `--ticker` | string | Yes | Asset ticker symbol |
 | `--horizon` | int | Yes | Forecast horizon - number of periods |
 | `--output` | string | No | Output file path - default: stdout |
@@ -126,17 +152,19 @@ flowchart TD
         D --> E
         E --> F[Calculate Simple Returns]
         F --> G[Reshape to 3D Tensor]
-        G --> H[Preprocessed Data]
+        G --> H[Preprocessed Data - Returns Space]
     end
+
+    H -->|Store Last Price| I[P_last for Reconstruction]
 ```
 
 **Key Functions:**
 
 | Function | Input | Output | Description |
 |----------|-------|--------|-------------|
-| `load_data` | file_path | pd.DataFrame | Load CSV/JSON data |
+| `load_data` | file_path | pd.DataFrame | Load CSV/JSON price data |
 | `impute_missing` | pd.Series | pd.Series | Forward fill missing values at t with t-1 |
-| `calculate_returns` | pd.Series | pd.Series | Compute R_t = P_t - P_t-1 / P_t-1 |
+| `calculate_returns` | pd.Series | pd.Series | Compute R_t = (P_t - P_t-1) / P_t-1 |
 | `reshape_for_lstm` | np.array, window_size | np.array | Reshape to 3D: Samples, Time Steps, Features |
 
 ### 4.3 ARIMA Engine Module
@@ -145,14 +173,14 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[Input Series] --> B[ADF Stationarity Test]
+    A[Input Returns Series] --> B[ADF Stationarity Test]
     B --> C{Is Stationary?}
     C -->|No| D[Apply Differencing]
     D --> B
     C -->|Yes| E[Auto-ARIMA Selection]
     E --> F[Minimize AIC]
     F --> G[Fit ARIMA Model]
-    G --> H[Generate Linear Forecast]
+    G --> H[Generate Linear Forecast - Returns Space]
     H --> I[Extract Residuals]
     I --> J[Output: Linear Forecast + Residuals]
 ```
@@ -161,10 +189,10 @@ flowchart TD
 
 | Function | Input | Output | Description |
 |----------|-------|--------|-------------|
-| `test_stationarity` | pd.Series | tuple - bool, p_value | Perform ADF test |
+| `test_stationarity` | pd.Series | tuple - bool, p_value | Perform ADF test on returns |
 | `find_optimal_params` | pd.Series | tuple - p,d,q | Auto-ARIMA with AIC minimization |
-| `fit_arima` | pd.Series, params | ARIMAResults | Fit ARIMA model |
-| `extract_residuals` | pd.Series, ARIMAResults | pd.Series | Calculate residuals: actual - predicted |
+| `fit_arima` | pd.Series, params | ARIMAResults | Fit ARIMA model to returns |
+| `extract_residuals` | pd.Series, ARIMAResults | pd.Series | Calculate residuals: actual - predicted returns |
 
 ### 4.4 LSTM Engine Module
 
@@ -180,11 +208,11 @@ flowchart TD
     end
 
     subgraph Training Pipeline
-        F[Residuals 3D Tensor] --> G[Rolling Window Split]
+        F[Residuals 3D Tensor - Returns Space] --> G[Rolling Window Split]
         G --> H[Train LSTM]
         H --> I{Early Stopping?}
         I -->|No| H
-        I -->|Yes| J[Non-linear Forecast]
+        I -->|Yes| J[Non-linear Forecast - Returns Space]
     end
 ```
 
@@ -197,16 +225,16 @@ flowchart TD
 | `batch_size` | 64 | Training batch size |
 | `dropout_rate` | 0.4 | Dropout regularization |
 | `optimizer` | Adam | Optimization algorithm |
-| `window_size` | 20-100 | Rolling window days |
+| `window_size` | 20-100 | Rolling window periods |
 
 **Key Functions:**
 
 | Function | Input | Output | Description |
 |----------|-------|--------|-------------|
 | `build_lstm_model` | config | keras.Model | Construct LSTM architecture |
-| `create_rolling_windows` | data, window_size | X, y arrays | Generate training sequences |
+| `create_rolling_windows` | data, window_size | X, y arrays | Generate training sequences from returns |
 | `train_lstm` | model, X, y | trained model | Train with early stopping |
-| `predict_residuals` | model, X | np.array | Generate non-linear predictions |
+| `predict_residuals` | model, X | np.array | Generate non-linear predictions in returns space |
 
 ### 4.5 Hybrid Combiner Module
 
@@ -214,21 +242,38 @@ flowchart TD
 
 ```mermaid
 flowchart LR
-    A[ARIMA Linear Forecast] --> C[Hybrid Combiner]
-    B[LSTM Residual Forecast] --> C
-    C --> D[Final Hybrid Prediction]
+    A[ARIMA Linear Forecast - Returns Space] --> C[Hybrid Combiner]
+    B[LSTM Residual Forecast - Returns Space] --> C
+    C --> D[Returns-Space Forecast]
+    D --> E[Price Converter]
+    E --> F[Price-Space Forecast]
 ```
 
-**Combination Formula:**
+**Combination Formula - Returns Space:**
 
 ```
-ŷ_t = L̂_t + N̂_t
+R̂_t = L̂_t + N̂_t
 
 Where:
-- ŷ_t = Final hybrid forecast
-- L̂_t = ARIMA linear prediction
-- N̂_t = LSTM residual prediction
+- R̂_t = Final hybrid returns forecast
+- L̂_t = ARIMA linear prediction (returns space)
+- N̂_t = LSTM residual prediction (returns space)
 ```
+
+**Price-Space Reconstruction Formula:**
+
+After combining predictions in returns space, convert to price space:
+
+```
+P̂_t = P_{t-1} × (1 + R̂_t)
+
+Where:
+- P̂_t = Final hybrid price forecast
+- P_{t-1} = Last observed price
+- R̂_t = Hybrid returns forecast from combination step
+```
+
+This formula inverts the simple returns calculation, converting percentage changes back to absolute prices.
 
 ### 4.6 Evaluation Module
 
@@ -236,27 +281,34 @@ Where:
 
 ```mermaid
 flowchart TD
-    A[Predictions] --> B[Calculate RMSE]
+    A[Predictions - Returns Space] --> B[Calculate RMSE]
     A --> C[Calculate MAE]
-    B --> D[Metrics Report]
+    B --> D[Metrics Report - Returns Space]
     C --> D
+    
+    E[Predictions - Price Space] --> F[Calculate RMSE]
+    E --> G[Calculate MAE]
+    F --> H[Metrics Report - Price Space]
+    G --> H
 
     subgraph Walk-Forward Validation
-        E[Historical Data] --> F[Train on Window]
-        F --> G[Predict Next Point]
-        G --> H[Slide Window Forward]
-        H --> I{More Data?}
-        I -->|Yes| F
-        I -->|No| J[Aggregate Metrics]
+        I[Historical Data] --> J[Train on Window]
+        J --> K[Predict Next Point]
+        K --> L[Slide Window Forward]
+        L --> M{More Data?}
+        M -->|Yes| J
+        M -->|No| N[Aggregate Metrics - Both Spaces]
     end
 ```
 
-**Metrics:**
+**Metrics - Calculated in Both Spaces:**
 
-| Metric | Formula | Description |
-|--------|---------|-------------|
-| RMSE | √ mean of squared errors | Root Mean Squared Error |
-| MAE | mean of absolute errors | Mean Absolute Error |
+| Metric | Formula | Space | Description |
+|--------|---------|-------|-------------|
+| RMSE | √ mean of squared errors | Returns | Root Mean Squared Error in returns percentage |
+| MAE | mean of absolute errors | Returns | Mean Absolute Error in returns percentage |
+| RMSE | √ mean of squared errors | Price | Root Mean Squared Error in price units |
+| MAE | mean of absolute errors | Price | Mean Absolute Error in price units |
 
 ---
 
@@ -265,36 +317,46 @@ flowchart TD
 ```mermaid
 flowchart TB
     subgraph Input
-        A[CSV/JSON File] --> B[Raw OHLCV Data]
+        A[CSV/JSON File] --> B[Raw Price Data P_t]
     end
 
-    subgraph Preprocessing
-        B --> C[Imputed Series]
-        C --> D[Returns Series]
+    subgraph Returns Processing
+        B --> C[Imputed Prices]
+        C --> D[Returns Series R_t]
     end
 
     subgraph ARIMA Processing
         D --> E[Stationary Series]
         E --> F[ARIMA Fit]
-        F --> G[Linear Predictions]
+        F --> G[Linear Predictions - R̂_t_ARIMA]
         F --> H[Residuals]
     end
 
     subgraph LSTM Processing
         H --> I[3D Tensor]
         I --> J[LSTM Training]
-        J --> K[Non-linear Predictions]
+        J --> K[Non-linear Predictions - R̂_t_LSTM]
     end
 
-    subgraph Combination
-        G --> L[Hybrid Forecast]
+    subgraph Hybrid Combination
+        G --> L[Hybrid Combination]
         K --> L
+        L --> M[Hybrid Returns Forecast R̂_t]
+    end
+
+    subgraph Price Reconstruction
+        M --> N[Price Converter]
+        C -->|Last Price P_last| N
+        N --> O[Hybrid Price Forecast P̂_t]
     end
 
     subgraph Output
-        L --> M[Metrics Calculation]
-        M --> N[CSV/JSON Export]
-        M --> O[STDOUT Progress]
+        M --> P[Metrics Calculation - Returns Space]
+        O --> Q[Metrics Calculation - Price Space]
+        P --> R[Dual-Space Results]
+        Q --> R
+        R --> S[CSV/JSON Export]
+        R --> T[STDOUT Progress]
     end
 ```
 
@@ -313,6 +375,7 @@ LSTM_ARIMA_V2/
 │   ├── arima_engine.py        # ARIMA component
 │   ├── lstm_engine.py         # LSTM component
 │   ├── hybrid_combiner.py     # Hybrid combination logic
+│   ├── price_converter.py     # Price-space reconstruction (future)
 │   ├── evaluation.py          # Metrics and validation
 │   └── output_manager.py      # Results export
 ├── tests/
@@ -335,7 +398,7 @@ LSTM_ARIMA_V2/
 **File:** `config/model_params.yml`
 
 ```yaml
-# ARIMA Configuration
+# ARIMA Configuration (operates on returns space)
 arima:
   seasonal: false
   max_p: 5
@@ -343,7 +406,7 @@ arima:
   max_q: 5
   information_criterion: aic
 
-# LSTM Configuration
+# LSTM Configuration (operates on returns space residuals)
 lstm:
   hidden_layers: 1
   nodes: 10
@@ -364,6 +427,12 @@ validation:
 hardware:
   use_opencl: true
   gpu_memory_fraction: 0.8
+
+# Output Configuration
+output:
+  include_returns_space: true
+  include_price_space: true
+  metrics_in_both_spaces: true
 ```
 
 ---
@@ -412,7 +481,7 @@ def run_hybrid_forecast(
     config: dict = None
 ) -> dict:
     """
-    Execute complete hybrid forecasting workflow.
+    Execute complete hybrid forecasting workflow with dual-space output.
 
     Args:
         data: Cleaned cryptocurrency price time series
@@ -421,25 +490,63 @@ def run_hybrid_forecast(
 
     Returns:
         dict containing:
-            - predictions: np.array of forecast values
-            - arima_component: np.array of linear predictions
-            - lstm_component: np.array of residual predictions
-            - metrics: dict with RMSE and MAE values
+            - predictions_returns: np.array of forecast values (returns space)
+            - predictions_price: np.array of forecast values (price space)
+            - arima_component: np.array of linear predictions (returns space)
+            - lstm_component: np.array of residual predictions (returns space)
+            - metrics_returns: dict with RMSE and MAE (returns space)
+            - metrics_price: dict with RMSE and MAE (price space)
             - model_params: dict with fitted ARIMA (p,d,q) params
+            - last_price: float - price used for reconstruction
     """
 ```
 
 ### 9.2 CLI Interface
 
 ```bash
-# Basic usage
+# Basic usage - outputs both returns and price space
 python forecaster.py --input data/btc_prices.csv --ticker BTC --horizon 10
 
-# With custom output
+# With custom output - CSV includes both space columns
 python forecaster.py --input data/eth_prices.json --ticker ETH --horizon 30 --output results/forecast.csv
 
 # With custom configuration
 python forecaster.py --input data/btc_prices.csv --ticker BTC --horizon 10 --config config/custom_params.yml
+```
+
+**Output Format - CSV (Dual Space):**
+
+```
+timestamp,prediction_returns,prediction_price,arima_component,lstm_component
+t1,0.0125,50125.50,0.0100,0.0025
+t2,0.0089,50570.25,0.0080,-0.0009
+t3,-0.0034,50296.18,-0.0045,0.0011
+```
+
+**Output Format - JSON (Dual Space):**
+
+```json
+{
+  "timestamp": "2026-01-15T08:00:00",
+  "ticker": "BTC",
+  "horizon": 10,
+  "predictions_returns": [0.0125, 0.0089, -0.0034, ...],
+  "predictions_price": [50125.50, 50570.25, 50296.18, ...],
+  "arima_component": [0.0100, 0.0080, -0.0045, ...],
+  "lstm_component": [0.0025, -0.0009, 0.0011, ...],
+  "metrics_returns": {
+    "rmse": 0.0045,
+    "mae": 0.0032
+  },
+  "metrics_price": {
+    "rmse": 225.50,
+    "mae": 160.25
+  },
+  "model_params": {
+    "arima_order": [1, 1, 1],
+    "last_price": 50000.00
+  }
+}
 ```
 
 ---
@@ -453,18 +560,20 @@ flowchart TD
     B -->|ARIMA Convergence| D[ModelConvergenceError]
     B -->|File I/O| E[FileIOError]
     B -->|Configuration| F[ConfigurationError]
+    B -->|Price Conversion| G[PriceConversionError]
 
-    C --> G[Log Error Details]
-    D --> G
-    E --> G
-    F --> G
+    C --> H[Log Error Details]
+    D --> H
+    E --> H
+    F --> H
+    G --> H
 
-    G --> H{Is Recoverable?}
-    H -->|Yes| I[Apply Fallback Strategy]
-    H -->|No| J[Exit with Error Code]
+    H --> I{Is Recoverable?}
+    I -->|Yes| J[Apply Fallback Strategy]
+    I -->|No| K[Exit with Error Code]
 
-    I --> K[Continue Processing]
-    J --> L[Display User-Friendly Message]
+    J --> L[Continue Processing]
+    K --> M[Display User-Friendly Message]
 ```
 
 | Error Type | Recovery Strategy |
@@ -473,12 +582,13 @@ flowchart TD
 | Non-convergent ARIMA | Log warning, use default params |
 | Invalid ticker | Exit with valid options list |
 | GPU unavailable | Fallback to CPU processing |
+| Price conversion failure | Return returns-space only, log warning |
 
 ---
 
 ## 11. Validation Strategy
 
-### 11.1 Walk-Forward Validation
+### 11.1 Walk-Forward Validation - Dual Space
 
 ```mermaid
 flowchart LR
@@ -487,15 +597,18 @@ flowchart LR
     end
 
     subgraph Iteration 1
-        G[Train: t=0 to t=2] --> H[Test: t=3]
+        G[Train: t=0 to t=2] --> H[Test Returns: t=3]
+        H --> I[Reconstruct Price: t=3]
     end
 
     subgraph Iteration 2
-        I[Train: t=0 to t=3] --> J[Test: t=4]
+        J[Train: t=0 to t=3] --> K[Test Returns: t=4]
+        K --> L[Reconstruct Price: t=4]
     end
 
     subgraph Iteration 3
-        K[Train: t=0 to t=4] --> L[Test: t=5]
+        M[Train: t=0 to t=4] --> N[Test Returns: t=5]
+        N --> O[Reconstruct Price: t=5]
     end
 ```
 
@@ -503,9 +616,10 @@ flowchart LR
 
 | Test Type | File | Coverage |
 |-----------|------|----------|
-| Unit Tests | `test_arima.py` | ADF test, ARIMA fitting |
-| Unit Tests | `test_lstm.py` | Model construction, tensor reshaping |
-| Integration Tests | `test_hybrid_integration.py` | End-to-end pipeline |
+| Unit Tests | `test_arima.py` | ADF test, ARIMA fitting in returns space |
+| Unit Tests | `test_lstm.py` | Model construction, tensor reshaping from returns |
+| Unit Tests | `test_price_converter.py` | Price-space reconstruction mathematics |
+| Integration Tests | `test_hybrid_integration.py` | End-to-end dual-space pipeline |
 
 ---
 
@@ -521,16 +635,19 @@ flowchart TD
     D -->|Yes| E[Configure TensorFlow for GPU]
     D -->|No| F[Use CPU Backend]
     B -->|No| F
-    E --> G[Execute LSTM on GPU]
-    F --> H[Execute LSTM on CPU]
+    E --> G[Execute LSTM on GPU - Returns Space]
+    F --> H[Execute LSTM on CPU - Returns Space]
+    G --> I[Price Reconstruction on CPU]
+    H --> I
 ```
 
 ### 12.2 Performance Considerations
 
 | Operation | CPU | GPU with OpenCL |
 |-----------|-----|-----------------|
-| ARIMA fitting | Default | N/A - CPU only |
-| LSTM training | Slow | Accelerated |
+| ARIMA fitting (returns space) | Default | N/A - CPU only |
+| LSTM training (returns space) | Slow | Accelerated |
+| Price reconstruction | Fast | Not needed |
 | Matrix operations | NumPy | OpenCL parallelization |
 
 ---
@@ -539,12 +656,15 @@ flowchart TD
 
 | ID | Criterion | Validation Method |
 |----|-----------|-------------------|
-| AC1 | Hybrid model RMSE is lower than standalone ARIMA benchmark | Integration test comparison |
+| AC1 | Hybrid model RMSE (returns space) is lower than standalone ARIMA benchmark | Integration test comparison |
 | AC2 | Model saves and loads training states to .pkl or .h5 files | Unit test for serialization |
 | AC3 | No temporal data leakage | Code review, validation test |
 | AC4 | LSTM activation encompasses residual range of -2 to 2 | Architecture verification |
 | AC5 | CLI accepts all specified arguments | CLI integration test |
 | AC6 | Progress output to STDOUT during training | Manual verification |
+| AC7 | CSV/JSON output contains both returns-space and price-space forecasts | Output file inspection |
+| AC8 | Price-space reconstruction uses correct formula: P̂_t = P_{t-1} × (1 + R̂_t) | Unit test for conversion |
+| AC9 | Metrics calculated correctly in both spaces | Cross-validation tests |
 
 ---
 
@@ -555,33 +675,67 @@ flowchart TD
 - **Temporal Order:** No future data leakage - strict train/test separation
 - **Data Validation:** Input validation before processing
 - **Error Boundaries:** Graceful degradation on invalid inputs
+- **Space Consistency:** Returns-space used for all modeling, price-space only for output
 
 ### 14.2 Model Constraints
 
-- LSTM activation must handle residual correlation range of -2 to 2
-- ARIMA differencing limited to d <= 2 for stability
+- LSTM activation must handle residual correlation range of -2 to 2 (returns space)
+- ARIMA differencing limited to d <= 2 for stability (returns space)
 - Early stopping to prevent overfitting
+- Price reconstruction requires valid last price value
+- Negative prices post-reconstruction should trigger warning
 
 ---
 
 ## 15. Appendix: Mathematical Foundations
 
-### 15.1 Simple Returns Calculation
+### 15.1 Simple Returns Calculation (Price → Returns)
 
 ```
 R_t = (P_t - P_{t-1}) / P_{t-1}
 ```
 
-### 15.2 ADF Test Hypothesis
+**Example:**
+- P_{t-1} = 100
+- P_t = 102
+- R_t = (102 - 100) / 100 = 0.02 (2% return)
+
+### 15.2 Price Reconstruction (Returns → Price)
+
+```
+P̂_t = P_{t-1} × (1 + R̂_t)
+```
+
+**Example:**
+- P_{t-1} = 100
+- R̂_t = 0.02 (predicted 2% return)
+- P̂_t = 100 × (1 + 0.02) = 102
+
+This formula is the inverse of simple returns calculation and reconstructs absolute prices from percentage returns.
+
+### 15.3 Multi-Step Price Reconstruction (For Horizon > 1)
+
+```
+P̂_{t+1} = P_t × (1 + R̂_{t+1})
+P̂_{t+2} = P̂_{t+1} × (1 + R̂_{t+2})
+...
+P̂_{t+h} = P̂_{t+h-1} × (1 + R̂_{t+h})
+```
+
+Each step compounds on the previous reconstructed price, creating a continuous price path.
+
+### 15.4 ADF Test Hypothesis (Returns Space)
 
 - H0: Series has a unit root (non-stationary)
 - H1: Series is stationary
 - Reject H0 if p-value < 0.05
 
-### 15.3 ARIMA Model
+Conducted on returns series to ensure stationarity before ARIMA modeling.
+
+### 15.5 ARIMA Model (Returns Space)
 
 ```
-(1 - Σφ_i * L^i)(1 - L)^d * X_t = (1 + Σθ_j * L^j) * ε_t
+(1 - Σφ_i * L^i)(1 - L)^d * R_t = (1 + Σθ_j * L^j) * ε_t
 ```
 
 Where:
@@ -589,8 +743,9 @@ Where:
 - θ_j = MA coefficients
 - L = Lag operator
 - d = Differencing order
+- R_t = Returns series (not prices)
 
-### 15.4 LSTM Gate Equations
+### 15.6 LSTM Gate Equations (On Returns Residuals)
 
 ```
 Forget gate:    f_t = σ(W_f · [h_{t-1}, x_t] + b_f)
@@ -601,7 +756,43 @@ Output gate:    o_t = σ(W_o · [h_{t-1}, x_t] + b_o)
 Hidden state:   h_t = o_t * tanh(C_t)
 ```
 
+**Note:** Input x_t consists of ARIMA residuals in returns space
+
+### 15.7 Hybrid Forecasting Frame
+
+**Returns Space:**
+```
+R̂_t = L̂_t + N̂_t + ε_t
+
+Where:
+- L̂_t = ARIMA prediction (linear component)
+- N̂_t = LSTM prediction (non-linear component)
+```
+
+**Price Space (Reconstructed):**
+```
+P̂_t = P_{t-1} × (1 + R̂_t)
+    = P_{t-1} × (1 + L̂_t + N̂_t + ε_t)
+```
+
+The error term ε_t is typically small and may be omitted in practice.
+
 ---
 
-*Document Version: 1.0*
-*Last Updated: 2026-01-07*
+## 16. Glossary - Space Terminology
+
+| Term | Definition | Location in Pipeline |
+|------|-----------|----------------------|
+| **Price Space** | Absolute price values (e.g., $50,000 for BTC) | Input and final output |
+| **Returns Space** | Percentage changes (e.g., 0.02 = 2% change) | Internal processing |
+| **Returns Forecast** | Predicted percentage changes in returns space | Intermediate output |
+| **Price Forecast** | Reconstructed absolute prices in price space | Final output |
+| **ARIMA Component** | Linear model predictions in returns space | Dual-space outputs |
+| **LSTM Component** | Non-linear model predictions in returns space | Dual-space outputs |
+| **Last Price** | Final observed price used for reconstruction | Metadata |
+
+---
+
+*Document Version: 2.0 (Dual-Space Architecture)*
+*Last Updated: 2026-01-15*
+*Major Changes: Added dual-space (returns and price) output architecture, price reconstruction formulas, and updated data flow to show reconstruction step*

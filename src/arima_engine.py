@@ -3,13 +3,31 @@ ARIMA Engine Module for Hybrid LSTM-ARIMA Forecasting System
 
 This module provides ARIMA (AutoRegressive Integrated Moving Average) functionality
 for time series forecasting. It handles stationarity testing, parameter optimization,
-model fitting, and residual extraction.
+model fitting, residual extraction, and forecast generation.
+
+All operations are performed in RETURNS SPACE (not price space) as per the hybrid
+architecture. The module combines statistical analysis with automated parameter
+selection to provide robust linear predictions for the hybrid modeling framework.
 
 Functions:
     - test_stationarity: Perform Augmented Dickey-Fuller (ADF) test
     - find_optimal_params: Auto-ARIMA parameter selection with AIC minimization
     - fit_arima: Fit ARIMA model with specified (p, d, q) parameters
     - extract_residuals: Calculate residuals as actual - predicted values
+    - forecast_arima: Generate forecast predictions for specified horizon
+
+Configuration (from architecture):
+    - seasonal: false (non-seasonal ARIMA)
+    - max_p: 5 (maximum AR order)
+    - max_d: 2 (maximum differencing order, limited for stability)
+    - max_q: 5 (maximum MA order)
+    - information_criterion: aic (Akaike Information Criterion)
+
+Error Handling Strategy (Section 10):
+    - If ARIMA doesn't converge, logs warning and uses default params (1, 1, 1)
+    - Validates input series is not empty and contains no NaN values
+    - All model convergence failures are logged for debugging
+    - ModelConvergenceError raised on critical failures
 """
 
 import logging
@@ -20,10 +38,12 @@ from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tools.eval_measures import aic, bic
 
+from src.exceptions import DataValidationError, ModelConvergenceError
+from src.logger_config import get_logger, log_exception
 
-# Configure logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+
+# Configure module logging
+logger = get_logger(__name__)
 
 
 def test_stationarity(series: pd.Series) -> Tuple[bool, float]:
@@ -43,7 +63,7 @@ def test_stationarity(series: pd.Series) -> Tuple[bool, float]:
             - p_value (float): The p-value from the ADF test
 
     Raises:
-        ValueError: If the input series is empty or contains NaN values
+        DataValidationError: If the input series is empty or contains NaN values
         Exception: For any statsmodels ADF test failures
 
     Examples:
@@ -55,15 +75,15 @@ def test_stationarity(series: pd.Series) -> Tuple[bool, float]:
     if len(series) == 0:
         error_msg = "Series is empty"
         logger.error(error_msg)
-        raise ValueError(error_msg)
+        raise DataValidationError(error_message=error_msg, data_shape=(0,))
 
     if series.isna().any():
-        error_msg = "Series contains NaN values"
+        error_msg = f"Series contains {series.isna().sum()} NaN values"
         logger.error(error_msg)
-        raise ValueError(error_msg)
+        raise DataValidationError(error_message=error_msg, data_shape=(len(series),))
 
     try:
-        logger.info(f"Performing ADF test on series of length {len(series)}")
+        logger.info(f"Performing ADF test on returns series of length {len(series)}")
 
         # Perform ADF test
         adf_result = adfuller(series, autolag="AIC")
@@ -74,13 +94,16 @@ def test_stationarity(series: pd.Series) -> Tuple[bool, float]:
         # Determine stationarity (p-value < 0.05 indicates stationarity)
         is_stationary = p_value < 0.05
 
-        logger.info(f"ADF Test Results - Test Statistic: {adf_result[0]:.6f}, p-value: {p_value:.6f}, Stationary: {is_stationary}")
+        logger.info(f"ADF test: statistic={adf_result[0]:.6f}, p-value={p_value:.6f}, stationary={is_stationary}")
 
         return is_stationary, p_value
 
+    except DataValidationError:
+        raise
     except Exception as e:
         error_msg = f"ADF test failed: {str(e)}"
         logger.error(error_msg)
+        log_exception(logger, e)
         raise
 
 
@@ -217,20 +240,25 @@ def fit_arima(series: pd.Series, order: Tuple[int, int, int]):
         logger.warning(f"Differencing order d={d} exceeds recommended limit of 2")
 
     try:
-        logger.info(f"Fitting ARIMA model with order {order} on series of length {len(series)}")
+        logger.info(f"Fitting ARIMA model with order {order} on returns series of length {len(series)}")
 
         # Create and fit ARIMA model
         model = ARIMA(series, order=order)
         results = model.fit()
 
-        logger.info(f"ARIMA model fitted successfully. AIC: {results.aic:.4f}, BIC: {results.bic:.4f}")
+        logger.info(f"ARIMA model fitted successfully with order {order}. AIC: {results.aic:.4f}, BIC: {results.bic:.4f}")
 
         return results
 
     except Exception as e:
-        error_msg = f"ARIMA model fitting failed with order {order}: {str(e)}"
+        error_msg = f"ARIMA{order} convergence failed: {str(e)}"
         logger.error(error_msg)
-        raise
+        log_exception(logger, e)
+        raise ModelConvergenceError(
+            error_message=error_msg,
+            model_type="ARIMA",
+            parameters=order
+        ) from e
 
 
 def extract_residuals(series: pd.Series, arima_model) -> pd.Series:
@@ -300,5 +328,71 @@ def extract_residuals(series: pd.Series, arima_model) -> pd.Series:
 
     except Exception as e:
         error_msg = f"Failed to extract residuals: {str(e)}"
+        logger.error(error_msg)
+        raise
+
+
+def forecast_arima(arima_model, horizon: int) -> np.ndarray:
+    """
+    Generate ARIMA forecast predictions for a specified horizon.
+
+    Uses the fitted ARIMA model to produce out-of-sample predictions for the
+    next 'horizon' time periods. All predictions are in returns space.
+
+    Args:
+        arima_model: Fitted ARIMA model results object (from fit_arima)
+        horizon (int): Number of periods to forecast (must be > 0)
+
+    Returns:
+        np.ndarray: Array of predictions for the next 'horizon' periods in returns space
+            Shape: (horizon,)
+
+    Raises:
+        ValueError: If horizon is invalid or <= 0
+        AttributeError: If arima_model lacks required forecasting methods
+        Exception: If forecast generation fails
+
+    Examples:
+        >>> returns = pd.Series(np.random.randn(100))
+        >>> model = fit_arima(returns, order=(1, 1, 1))
+        >>> forecast = forecast_arima(model, horizon=10)
+        >>> print(f"Forecast shape: {forecast.shape}, Values: {forecast}")
+
+    Note:
+        - All values are in RETURNS SPACE (not price space)
+        - Forecast is generated using the model's get_forecast method
+        - Returns predictions only (without confidence intervals)
+    """
+    # Validate inputs
+    if not isinstance(horizon, int) or horizon <= 0:
+        error_msg = f"Invalid horizon: {horizon}. Must be a positive integer"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+
+    if not hasattr(arima_model, "get_forecast"):
+        error_msg = "Invalid ARIMA model object - missing get_forecast method"
+        logger.error(error_msg)
+        raise AttributeError(error_msg)
+
+    try:
+        logger.info(f"Generating ARIMA forecast for horizon={horizon}")
+
+        # Generate forecast using the fitted model
+        forecast_result = arima_model.get_forecast(steps=horizon)
+
+        # Extract point predictions
+        forecast_values = forecast_result.predicted_mean.values
+
+        logger.info(
+            f"ARIMA forecast generated successfully. Horizon: {horizon}, "
+            f"Mean forecast value: {np.mean(forecast_values):.6f}, "
+            f"Std: {np.std(forecast_values):.6f}, "
+            f"Min: {np.min(forecast_values):.6f}, Max: {np.max(forecast_values):.6f}"
+        )
+
+        return forecast_values
+
+    except Exception as e:
+        error_msg = f"ARIMA forecast generation failed: {str(e)}"
         logger.error(error_msg)
         raise

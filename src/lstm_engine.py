@@ -10,10 +10,14 @@ Functions:
     - create_rolling_windows: Generate training sequences (X, y arrays)
     - train_lstm: Train LSTM model with early stopping
     - predict_residuals: Generate non-linear predictions on residuals
+
+Error Handling & Logging: Section 10, Error Handling Strategy
 """
 
 import logging
 import numpy as np
+import traceback
+import time
 from typing import Tuple, Dict, Any
 import tensorflow as tf
 from tensorflow import keras
@@ -23,10 +27,12 @@ from tensorflow.keras.regularizers import l2
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 
+from src.exceptions import ConfigurationError, DataValidationError
+from src.logger_config import get_logger, log_exception
 
-# Configure logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+
+# Configure module logging
+logger = get_logger(__name__)
 
 
 def build_lstm_model(config: Dict[str, Any], input_shape: Tuple[int, int]) -> keras.Model:
@@ -79,7 +85,12 @@ def build_lstm_model(config: Dict[str, Any], input_shape: Tuple[int, int]) -> ke
     if hidden_layers < 1:
         error_msg = f"hidden_layers must be at least 1, got {hidden_layers}"
         logger.error(error_msg)
-        raise ValueError(error_msg)
+        raise ConfigurationError(
+            error_message=error_msg,
+            parameter_name="hidden_layers",
+            invalid_value=hidden_layers,
+            allowed_range="[1, ∞)"
+        )
 
     if nodes < 5 or nodes > 20:
         logger.warning(f"nodes={nodes} is outside recommended range [5, 20]. Using as-is.")
@@ -87,12 +98,22 @@ def build_lstm_model(config: Dict[str, Any], input_shape: Tuple[int, int]) -> ke
     if not (0 <= dropout_rate < 1):
         error_msg = f"dropout_rate must be in [0, 1), got {dropout_rate}"
         logger.error(error_msg)
-        raise ValueError(error_msg)
+        raise ConfigurationError(
+            error_message=error_msg,
+            parameter_name="dropout_rate",
+            invalid_value=dropout_rate,
+            allowed_range="[0, 1)"
+        )
 
     if l2_reg < 0:
         error_msg = f"l2_regularization must be non-negative, got {l2_reg}"
         logger.error(error_msg)
-        raise ValueError(error_msg)
+        raise ConfigurationError(
+            error_message=error_msg,
+            parameter_name="l2_regularization",
+            invalid_value=l2_reg,
+            allowed_range="[0, ∞)"
+        )
 
     # Validate input shape
     if len(input_shape) != 2:
@@ -166,9 +187,12 @@ def build_lstm_model(config: Dict[str, Any], input_shape: Tuple[int, int]) -> ke
 
         return model
 
+    except ConfigurationError:
+        raise
     except Exception as e:
         error_msg = f"Failed to build LSTM model: {str(e)}"
         logger.error(error_msg)
+        log_exception(logger, e)
         raise
 
 
@@ -430,6 +454,7 @@ def train_lstm(
     except Exception as e:
         error_msg = f"LSTM training failed: {str(e)}"
         logger.error(error_msg)
+        log_exception(logger, e)
         raise
 
 
@@ -505,4 +530,5 @@ def predict_residuals(model: keras.Model, X: np.ndarray) -> np.ndarray:
     except Exception as e:
         error_msg = f"Residual prediction failed: {str(e)}"
         logger.error(error_msg)
+        log_exception(logger, e)
         raise

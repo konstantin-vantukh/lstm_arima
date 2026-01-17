@@ -10,6 +10,8 @@ Functions:
     - calculate_mae: Calculate Mean Absolute Error
     - walk_forward_validation: Perform walk-forward validation on time series data
     - create_metrics_report: Generate comprehensive metrics report with metadata
+
+Error Handling & Logging: Section 10, Error Handling Strategy
 """
 
 import logging
@@ -17,9 +19,11 @@ import numpy as np
 import pandas as pd
 from typing import Callable, Dict, Tuple, Union, Any
 
-# Configure logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+from src.exceptions import DataValidationError
+from src.logger_config import get_logger, log_exception
+
+# Configure module logging
+logger = get_logger(__name__)
 
 
 def calculate_rmse(actual: np.ndarray, predicted: np.ndarray) -> float:
@@ -86,7 +90,11 @@ def calculate_rmse(actual: np.ndarray, predicted: np.ndarray) -> float:
     except TypeError as e:
         error_msg = f"Type error in calculate_rmse: {str(e)}"
         logger.error(error_msg)
-        raise ValueError(error_msg) from e
+        log_exception(logger, e)
+        raise DataValidationError(
+            error_message=error_msg,
+            data_shape=(len(actual), len(predicted))
+        ) from e
 
 
 def calculate_mae(actual: np.ndarray, predicted: np.ndarray) -> float:
@@ -150,7 +158,11 @@ def calculate_mae(actual: np.ndarray, predicted: np.ndarray) -> float:
     except TypeError as e:
         error_msg = f"Type error in calculate_mae: {str(e)}"
         logger.error(error_msg)
-        raise ValueError(error_msg) from e
+        log_exception(logger, e)
+        raise DataValidationError(
+            error_message=error_msg,
+            data_shape=(len(actual), len(predicted))
+        ) from e
 
 
 def walk_forward_validation(
@@ -322,6 +334,154 @@ def walk_forward_validation(
 
     except (TypeError, ValueError) as e:
         logger.error(f"Error in walk_forward_validation: {str(e)}")
+        log_exception(logger, e)
+        raise
+
+
+def calculate_metrics_returns_space(
+    actual_returns: np.ndarray, predicted_returns: np.ndarray
+) -> Dict[str, float]:
+    """
+    Calculate performance metrics in RETURNS SPACE (percentage changes).
+    
+    Computes RMSE and MAE metrics on returns-space predictions, where both
+    actual and predicted values represent percentage changes rather than
+    absolute prices.
+    
+    This metric space is useful for:
+    - Scale-free comparison across different price levels
+    - Evaluating model performance on percentage changes
+    - Comparing models across different assets
+    
+    Args:
+        actual_returns (np.ndarray): Array of actual returns (percentage changes)
+            Shape: (n_samples,) - 1D array of observed return values
+            Values typically in range [-1, inf), e.g., 0.02 = +2%, -0.05 = -5%
+        predicted_returns (np.ndarray): Array of predicted returns (percentage changes)
+            Shape: (n_samples,) - 1D array of forecasted return values
+            Must have same length as actual_returns
+    
+    Returns:
+        Dict[str, float]: Dictionary containing metrics calculated in returns space:
+            - 'rmse': float - Root Mean Squared Error of returns predictions
+                Computed as √(mean((actual - predicted)²))
+                Penalizes large errors more heavily
+            - 'mae': float - Mean Absolute Error of returns predictions
+                Computed as mean(|actual - predicted|)
+                Treats all errors equally
+    
+    Raises:
+        ValueError: If arrays are empty, have mismatched lengths, or contain invalid values
+        TypeError: If input is not a numpy array or cannot be converted
+    
+    Examples:
+        >>> actual_ret = np.array([0.01, 0.02, -0.01, 0.015])
+        >>> pred_ret = np.array([0.011, 0.019, -0.012, 0.014])
+        >>> metrics = calculate_metrics_returns_space(actual_ret, pred_ret)
+        >>> print(f"Returns Space RMSE: {metrics['rmse']:.6f}")
+        >>> print(f"Returns Space MAE: {metrics['mae']:.6f}")
+    
+    Note:
+        - All calculations performed in returns space (percentage changes)
+        - Results are scale-free metrics independent of absolute price levels
+        - Metrics logged at INFO level for monitoring
+    """
+    try:
+        # Calculate metrics using existing functions
+        rmse = calculate_rmse(actual_returns, predicted_returns)
+        mae = calculate_mae(actual_returns, predicted_returns)
+        
+        # Log calculated metrics
+        logger.info(
+            f"Returns-space metrics calculated: RMSE={rmse:.6f}, MAE={mae:.6f}"
+        )
+        
+        # Return metrics dictionary
+        metrics = {
+            'rmse': float(rmse),
+            'mae': float(mae)
+        }
+        
+        return metrics
+        
+    except (ValueError, TypeError) as e:
+        error_msg = f"Error calculating returns-space metrics: {str(e)}"
+        logger.error(error_msg)
+        raise
+
+
+def calculate_metrics_price_space(
+    actual_prices: np.ndarray, predicted_prices: np.ndarray
+) -> Dict[str, float]:
+    """
+    Calculate performance metrics in PRICE SPACE (absolute price units).
+    
+    Computes RMSE and MAE metrics on price-space predictions, where both
+    actual and predicted values represent absolute prices rather than
+    percentage changes.
+    
+    This metric space is useful for:
+    - Economically intuitive error measurements (in currency units)
+    - Risk analysis in absolute terms
+    - Direct comparison with actual trading loss/gain
+    
+    Args:
+        actual_prices (np.ndarray): Array of actual prices (absolute values)
+            Shape: (n_samples,) - 1D array of observed price values
+            All values must be positive (prices > 0)
+        predicted_prices (np.ndarray): Array of predicted prices (absolute values)
+            Shape: (n_samples,) - 1D array of forecasted price values
+            Must have same length as actual_prices
+    
+    Returns:
+        Dict[str, float]: Dictionary containing metrics calculated in price space:
+            - 'rmse': float - Root Mean Squared Error of price predictions
+                Computed as √(mean((actual - predicted)²))
+                In absolute price units (e.g., USD, EUR)
+                Penalizes large errors more heavily
+            - 'mae': float - Mean Absolute Error of price predictions
+                Computed as mean(|actual - predicted|)
+                In absolute price units
+                Treats all errors equally
+    
+    Raises:
+        ValueError: If arrays are empty, have mismatched lengths, or contain invalid values
+        TypeError: If input is not a numpy array or cannot be converted
+    
+    Examples:
+        >>> actual_price = np.array([50000, 50500, 49800, 51000])
+        >>> pred_price = np.array([50100, 50400, 49900, 50900])
+        >>> metrics = calculate_metrics_price_space(actual_price, pred_price)
+        >>> print(f"Price Space RMSE: {metrics['rmse']:.2f}")
+        >>> print(f"Price Space MAE: {metrics['mae']:.2f}")
+    
+    Note:
+        - All calculations performed in price space (absolute prices)
+        - Results are in absolute currency units (e.g., USD for BTC)
+        - Metrics logged at INFO level for monitoring
+        - Generally used after price reconstruction from returns-space forecasts
+    """
+    try:
+        # Calculate metrics using existing functions
+        rmse = calculate_rmse(actual_prices, predicted_prices)
+        mae = calculate_mae(actual_prices, predicted_prices)
+        
+        # Log calculated metrics
+        logger.info(
+            f"Price-space metrics calculated: RMSE={rmse:.6f}, MAE={mae:.6f}"
+        )
+        
+        # Return metrics dictionary
+        metrics = {
+            'rmse': float(rmse),
+            'mae': float(mae)
+        }
+        
+        return metrics
+        
+    except (ValueError, TypeError) as e:
+        error_msg = f"Error calculating price-space metrics: {str(e)}"
+        logger.error(error_msg)
         raise
 
 
@@ -442,4 +602,5 @@ def create_metrics_report(
 
     except ValueError as e:
         logger.error(f"Error in create_metrics_report: {str(e)}")
+        log_exception(logger, e)
         raise

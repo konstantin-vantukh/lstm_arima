@@ -1,29 +1,44 @@
-# ARIMA Configuration
+# Hybrid LSTM-ARIMA Configuration File
+# Per Architecture Section 7 - Configuration Schema
+# All model parameters centralized for easy experimentation and deployment
+
+# ARIMA Configuration (operates on returns space)
+# Stationarity testing and auto-parameter selection for linear component
 arima:
   seasonal: false
-  max_p: 5
-  max_d: 2
-  max_q: 5
-  information_criterion: aic
+  max_p: 5                    # Maximum AR order
+  max_d: 2                    # Maximum differencing order
+  max_q: 5                    # Maximum MA order
+  information_criterion: aic  # AIC or BIC for parameter selection
 
-# LSTM Configuration
+# LSTM Configuration (operates on returns space residuals)
+# Non-linear residual modeling with regularization
 lstm:
-  hidden_layers: 1
-  nodes: 10
-  batch_size: 64
-  epochs: 100
-  dropout_rate: 0.4
-  l2_regularization: 0.01
-  window_size: 60
-  optimizer: adam
-  early_stopping_patience: 10
+  hidden_layers: 1            # Number of LSTM layers
+  nodes: 10                   # Neurons per layer (valid range: 5-20)
+  batch_size: 64              # Training batch size
+  epochs: 100                 # Maximum training epochs
+  dropout_rate: 0.4           # Dropout regularization (0.0-1.0)
+  l2_regularization: 0.01     # L2 weight regularization
+  window_size: 60             # Rolling window size for sequences
+  optimizer: adam             # Adam, SGD, or RMSprop
+  early_stopping_patience: 10 # Patience for early stopping
 
 # Validation Configuration
+# Walk-forward validation for time series
 validation:
-  method: walk_forward
-  test_size: 0.2
+  method: walk_forward        # walk_forward or time_series_split
+  test_size: 0.2              # Test set fraction (0.1-0.5)
 
 # Hardware Configuration
+# GPU acceleration settings (OpenCL support)
 hardware:
-  use_opencl: true
-  gpu_memory_fraction: 0.8
+  use_opencl: true            # Enable GPU acceleration if available
+  gpu_memory_fraction: 0.8    # GPU memory allocation (0.1-1.0)
+
+# Output Configuration
+# Dual-space processing (returns space and price space)
+output:
+  include_returns_space: true     # Include returns-space forecasts
+  include_price_space: true       # Include price-space forecasts
+  metrics_in_both_spaces: true    # Calculate metrics in both spaces

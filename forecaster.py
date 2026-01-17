@@ -8,6 +8,8 @@ Usage:
     python forecaster.py --input data/prices.csv --ticker BTC --horizon 10
     python forecaster.py --input data/prices.json --ticker ETH --horizon 30 --output results.csv
     python forecaster.py --input data/prices.csv --ticker BTC --horizon 10 --config config/params.yml
+
+Error Handling & Logging: Section 10, Error Handling Strategy
 """
 
 import argparse
@@ -32,14 +34,17 @@ from src.arima_engine import test_stationarity, find_optimal_params, fit_arima, 
 from src.lstm_engine import build_lstm_model, create_rolling_windows, train_lstm, predict_residuals
 from src.hybrid_combiner import combine_predictions, get_component_details
 from src.evaluation import calculate_rmse, calculate_mae, create_metrics_report
+from src.price_converter import reconstruct_price_series, validate_reconstructed_prices
 from src.output_manager import export_results, format_results_summary
+from src.config_loader import load_config, validate_config, get_default_config, merge_config, ConfigurationError
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
+# Import error handling and logging framework
+from src.exceptions import *
+from src.logger_config import configure_logging, get_logger, log_exception
+
+# Configure logging for the forecaster module
+configure_logging(log_level='INFO', log_file='output/run.log')
+logger = get_logger(__name__)
 
 
 def create_argument_parser() -> argparse.ArgumentParser:
@@ -105,82 +110,6 @@ Examples:
     return parser
 
 
-def load_default_config() -> Dict[str, Any]:
-    """
-    Load default model configuration.
-    
-    Returns:
-        dict: Default configuration parameters
-    """
-    default_config = {
-        'arima': {
-            'seasonal': False,
-            'max_p': 5,
-            'max_d': 2,
-            'max_q': 5,
-            'information_criterion': 'aic'
-        },
-        'lstm': {
-            'hidden_layers': 1,
-            'nodes': 10,
-            'batch_size': 64,
-            'epochs': 100,
-            'dropout_rate': 0.4,
-            'l2_regularization': 0.01,
-            'window_size': 60,
-            'optimizer': 'adam',
-            'early_stopping_patience': 10
-        },
-        'validation': {
-            'method': 'walk_forward',
-            'test_size': 0.2
-        }
-    }
-    return default_config
-
-
-def load_config_from_file(config_path: str) -> Dict[str, Any]:
-    """
-    Load configuration from YAML file.
-    
-    Args:
-        config_path (str): Path to configuration file
-        
-    Returns:
-        dict: Configuration parameters
-        
-    Raises:
-        FileNotFoundError: If config file does not exist
-        ImportError: If PyYAML is not installed
-        yaml.YAMLError: If YAML parsing fails
-    """
-    if not YAML_AVAILABLE:
-        error_msg = "PyYAML module is required for configuration file support. Install with: pip install PyYAML"
-        logger.error(error_msg)
-        raise ImportError(error_msg)
-    
-    config_path = Path(config_path)
-    
-    if not config_path.exists():
-        error_msg = f"Configuration file not found: {config_path}"
-        logger.error(error_msg)
-        raise FileNotFoundError(error_msg)
-    
-    try:
-        logger.info(f"Loading configuration from {config_path}")
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
-        
-        logger.info("Configuration loaded successfully")
-        return config
-    except yaml.YAMLError as e:
-        error_msg = f"Failed to parse configuration file {config_path}: {str(e)}"
-        logger.error(error_msg)
-        raise
-    except Exception as e:
-        error_msg = f"Error reading configuration file {config_path}: {str(e)}"
-        logger.error(error_msg)
-        raise
 
 
 def validate_arguments(args: argparse.Namespace) -> None:
@@ -236,10 +165,16 @@ def run_hybrid_forecast(
     config: Dict[str, Any] = None
 ) -> Dict[str, Any]:
     """
-    Execute complete hybrid forecasting workflow.
+    Execute complete hybrid forecasting workflow with dual-space output.
     
-    Implements the main orchestration function from architecture Section 9.1.
-    Executes complete hybrid workflow: preprocessing → ARIMA → LSTM → combination
+    Implements the main orchestration function from architecture Section 9.1 and 9.2.
+    Executes complete hybrid workflow: preprocessing → ARIMA → LSTM → combination → price reconstruction
+    Generates both returns-space and price-space forecasts with metrics in both spaces.
+    
+    Per Architecture Section 4.1 (Pipeline):
+        Input Data (CSV/JSON) → CLI Validation → Preprocess (Returns Space) → ARIMA Fitting
+        → Extract Residuals → LSTM Training → Generate Forecasts → Hybrid Combination
+        → Price Reconstruction → Calculate Metrics (Both Spaces) → Export Results
     
     Args:
         data (pd.DataFrame): Cleaned cryptocurrency price time series
@@ -247,14 +182,17 @@ def run_hybrid_forecast(
         config (dict, optional): Model configuration overrides. If None, uses defaults.
     
     Returns:
-        dict: Results containing:
-            - predictions (np.ndarray): Combined hybrid forecast values
-            - arima_component (np.ndarray): Linear ARIMA component predictions
-            - lstm_component (np.ndarray): Non-linear LSTM residual predictions
-            - metrics (dict): Performance metrics with RMSE and MAE
-            - model_params (dict): Fitted ARIMA (p,d,q) parameters
+        dict: Results containing (per Architecture Section 9.1 Interface Contract):
+            - predictions_returns (np.ndarray): Combined hybrid forecast values (returns space)
+            - predictions_price (np.ndarray): Reconstructed price forecast (price space)
+            - arima_component (np.ndarray): Linear ARIMA component predictions (returns space)
+            - lstm_component (np.ndarray): Non-linear LSTM residual predictions (returns space)
+            - metrics_returns (dict): Performance metrics with RMSE and MAE (returns space)
+            - metrics_price (dict): Performance metrics with RMSE and MAE (price space)
+            - model_params (dict): Fitted ARIMA (p,d,q) parameters and last_price for reconstruction
             - component_stats (dict): Component contribution statistics
             - timestamp (str): Generation timestamp
+            - last_price (float): Last observed price used for price reconstruction
             
     Raises:
         ValueError: If data is invalid or workflow fails
@@ -410,54 +348,137 @@ def run_hybrid_forecast(
             f"LSTM={component_stats['lstm_contribution']:.2f}%"
         )
         
-        # ===== STEP 5: EVALUATION =====
+        # ===== STEP 5: PRICE RECONSTRUCTION =====
         logger.info("\n" + "-"*80)
-        logger.info("STEP 5: EVALUATION AND METRICS")
+        logger.info("STEP 5: PRICE RECONSTRUCTION (RETURNS → PRICE SPACE)")
         logger.info("-"*80)
         
-        # Calculate metrics on historical fitted values for validation
-        # Compare ARIMA + LSTM residual predictions vs actual returns
+        # Get last price for reconstruction (from price series)
+        last_price = float(prices.iloc[-1])
+        logger.info(f"Last observed price: ${last_price:.2f}")
+        
+        # Reconstruct prices from hybrid returns forecast (Formula: P̂_t = P_{t-1} × (1 + R̂_t))
+        try:
+            predicted_prices = reconstruct_price_series(last_price, hybrid_predictions)
+            logger.info(f"Price reconstruction successful")
+            logger.info(f"  Price range: ${predicted_prices.min():.2f} - ${predicted_prices.max():.2f}")
+            
+            # Validate reconstructed prices
+            price_validation = validate_reconstructed_prices(predicted_prices)
+            if not price_validation['is_valid']:
+                logger.warning(f"Price validation warnings: {price_validation['warnings']}")
+            
+        except Exception as e:
+            logger.error(f"Price reconstruction failed: {str(e)}")
+            # Fallback: keep predictions as-is if reconstruction fails
+            predicted_prices = hybrid_predictions.copy()
+            logger.warning("Falling back to returns-space predictions for price output")
+        
+        # ===== STEP 6: EVALUATION (DUAL-SPACE METRICS) =====
+        logger.info("\n" + "-"*80)
+        logger.info("STEP 6: EVALUATION AND METRICS (DUAL-SPACE)")
+        logger.info("-"*80)
+        
+        # Calculate metrics on historical fitted values for validation in RETURNS SPACE
+        metrics_returns = {}
+        metrics_price = {}
+        
         if len(lstm_residual_predictions) > 0:
+            # Extract historical prices for comparison
+            historical_prices = prices.values[:len(lstm_residual_predictions)+1]
+            
+            # Returns space metrics (compare actual vs fitted returns)
             arima_fitted = arima_model.fittedvalues.values[:len(lstm_residual_predictions)]
             hybrid_fitted = arima_fitted + lstm_residual_predictions
+            actual_returns = returns.values[:len(lstm_residual_predictions)]
             
-            rmse = calculate_rmse(returns.values[:len(lstm_residual_predictions)], hybrid_fitted)
-            mae = calculate_mae(returns.values[:len(lstm_residual_predictions)], hybrid_fitted)
+            rmse_returns = calculate_rmse(actual_returns, hybrid_fitted)
+            mae_returns = calculate_mae(actual_returns, hybrid_fitted)
             
-            logger.info(f"Validation metrics on historical data:")
-            logger.info(f"  RMSE: {rmse:.6f}")
-            logger.info(f"  MAE: {mae:.6f}")
-            
-            metrics = {
-                'rmse': float(rmse),
-                'mae': float(mae),
+            metrics_returns = {
+                'rmse': float(rmse_returns),
+                'mae': float(mae_returns),
                 'validation_samples': len(lstm_residual_predictions)
             }
+            
+            logger.info(f"Returns Space Metrics (Historical Validation):")
+            logger.info(f"  RMSE: {rmse_returns:.6f}")
+            logger.info(f"  MAE: {mae_returns:.6f}")
+            
+            # Price space metrics - reconstruct historical prices and compare
+            try:
+                reconstructed_historical = reconstruct_price_series(
+                    historical_prices[0], 
+                    hybrid_fitted
+                )
+                actual_historical_prices = historical_prices[1:len(hybrid_fitted)+1]
+                
+                rmse_price = calculate_rmse(actual_historical_prices, reconstructed_historical)
+                mae_price = calculate_mae(actual_historical_prices, reconstructed_historical)
+                
+                metrics_price = {
+                    'rmse': float(rmse_price),
+                    'mae': float(mae_price),
+                    'validation_samples': len(lstm_residual_predictions)
+                }
+                
+                logger.info(f"Price Space Metrics (Historical Validation):")
+                logger.info(f"  RMSE: ${rmse_price:.2f}")
+                logger.info(f"  MAE: ${mae_price:.2f}")
+                
+            except Exception as e:
+                logger.warning(f"Price space metrics calculation failed: {str(e)}")
+                # Use empty dict if price space metrics cannot be calculated
+                metrics_price = {
+                    'rmse': 0.0,
+                    'mae': 0.0,
+                    'validation_samples': 0,
+                    'error': str(e)
+                }
         else:
-            metrics = {
+            metrics_returns = {
+                'rmse': 0.0,
+                'mae': 0.0,
+                'validation_samples': 0
+            }
+            metrics_price = {
                 'rmse': 0.0,
                 'mae': 0.0,
                 'validation_samples': 0
             }
         
-        # ===== BUILD RESULT DICTIONARY =====
+        # ===== BUILD RESULT DICTIONARY (DUAL-SPACE) =====
         logger.info("\n" + "-"*80)
-        logger.info("BUILDING RESULTS DICTIONARY")
+        logger.info("BUILDING RESULTS DICTIONARY (DUAL-SPACE OUTPUT)")
         logger.info("-"*80)
         
         result = {
-            'predictions': hybrid_predictions,
-            'arima_component': arima_aligned,
-            'lstm_component': lstm_aligned,
-            'metrics': metrics,
+            # Dual-space predictions (per Architecture 9.1 interface contract)
+            'predictions_returns': hybrid_predictions,      # Returns space forecast
+            'predictions_price': predicted_prices,          # Price space forecast (reconstructed)
+            'predictions': predicted_prices,                # For backward compatibility with output_manager
+            'arima_component': arima_aligned,               # ARIMA linear (returns space)
+            'lstm_component': lstm_aligned,                 # LSTM non-linear (returns space)
+            # Dual-space metrics (per Architecture 9.1 interface contract)
+            'metrics_returns': metrics_returns,             # Metrics in returns space
+            'metrics_price': metrics_price,                 # Metrics in price space
+            'metrics': {                                    # For backward compatibility
+                **metrics_returns,
+                'metrics_price': metrics_price
+            },
+            # Model parameters with last price for reconstruction
             'model_params': {
                 'arima_order': optimal_order,
                 'lstm_window_size': window_size,
                 'lstm_nodes': lstm_config.get('nodes', 10),
-                'lstm_hidden_layers': lstm_config.get('hidden_layers', 1)
+                'lstm_hidden_layers': lstm_config.get('hidden_layers', 1),
+                'last_price': float(last_price)  # For reference/reconstruction verification
             },
+            # Component statistics
             'component_stats': component_stats,
-            'timestamp': datetime.now().isoformat()
+            # Metadata
+            'timestamp': datetime.now().isoformat(),
+            'last_price': float(last_price)  # Exposed for easy access
         }
         
         logger.info("\n" + "="*80)
@@ -469,6 +490,7 @@ def run_hybrid_forecast(
     except Exception as e:
         error_msg = f"Hybrid forecast workflow failed: {str(e)}"
         logger.error(error_msg)
+        log_exception(logger, e)
         raise
 
 
@@ -494,11 +516,18 @@ def main():
         # Validate arguments
         validate_arguments(args)
         
-        # Load configuration
-        if args.config is not None:
-            config = load_config_from_file(args.config)
-        else:
-            config = load_default_config()
+        # Load configuration using new config_loader module
+        try:
+            if args.config is not None:
+                config = load_config(config_path=args.config)
+                logger.info(f"Loaded configuration from {args.config}")
+            else:
+                config = load_config()
+                logger.info("Loaded default configuration")
+        except ConfigurationError as e:
+            error_msg = f"Configuration Error: {str(e)}"
+            logger.error(error_msg)
+            raise
         
         # Load data
         logger.info(f"\nLoading data from {args.input}")
@@ -509,7 +538,7 @@ def main():
         logger.info("\nStarting hybrid forecasting workflow...")
         results = run_hybrid_forecast(data, forecast_horizon=args.horizon, config=config)
         
-        # Add metadata to results
+        # Add metadata to results (per Architecture 9.2)
         results['ticker'] = args.ticker
         results['horizon'] = args.horizon
         results['input_file'] = args.input
@@ -518,11 +547,11 @@ def main():
         summary = format_results_summary(results)
         print("\n" + summary)
         
-        # Export results
+        # Export results with dual-space output
         if args.output == 'stdout':
             logger.info("Output to stdout requested. Summary displayed above.")
         else:
-            # Determine output format
+            # Determine output format and export dual-space results (per Architecture 9.2)
             output_path = args.output
             if output_path is not None:
                 format_ext = Path(output_path).suffix.lower()
@@ -533,10 +562,55 @@ def main():
             else:
                 output_format = 'csv'
             
-            logger.info(f"\nExporting results to {output_format.upper()}...")
-            exported_path = export_results(results, output_path=output_path, format=output_format)
-            logger.info(f"Results exported successfully to: {exported_path}")
-            print(f"\n✓ Results saved to: {exported_path}")
+            logger.info(f"\nExporting dual-space results to {output_format.upper()}...")
+            
+            # For dual-space CSV export, use export_to_csv from output_manager
+            if output_format == 'csv' and output_path:
+                from src.output_manager import export_to_csv
+                try:
+                    export_to_csv(
+                        output_path,
+                        predictions_returns=results.get('predictions_returns'),
+                        predictions_price=results.get('predictions_price'),
+                        arima_component=results.get('arima_component'),
+                        lstm_component=results.get('lstm_component'),
+                        metrics_returns=results.get('metrics_returns'),
+                        metrics_price=results.get('metrics_price')
+                    )
+                    logger.info(f"Results exported successfully to: {output_path}")
+                    print(f"\n✓ Results saved to: {output_path}")
+                except Exception as e:
+                    logger.error(f"CSV export failed: {str(e)}, falling back to legacy export")
+                    exported_path = export_results(results, output_path=output_path, format=output_format)
+                    print(f"\n✓ Results saved to: {exported_path}")
+            
+            # For dual-space JSON export, use export_to_json from output_manager
+            elif output_format == 'json' and output_path:
+                from src.output_manager import export_to_json
+                try:
+                    export_to_json(
+                        output_path,
+                        ticker=args.ticker,
+                        horizon=args.horizon,
+                        predictions_returns=results.get('predictions_returns'),
+                        predictions_price=results.get('predictions_price'),
+                        arima_component=results.get('arima_component'),
+                        lstm_component=results.get('lstm_component'),
+                        metrics_returns=results.get('metrics_returns'),
+                        metrics_price=results.get('metrics_price'),
+                        model_params=results.get('model_params')
+                    )
+                    logger.info(f"Results exported successfully to: {output_path}")
+                    print(f"\n✓ Results saved to: {output_path}")
+                except Exception as e:
+                    logger.error(f"JSON export failed: {str(e)}, falling back to legacy export")
+                    exported_path = export_results(results, output_path=output_path, format=output_format)
+                    print(f"\n✓ Results saved to: {exported_path}")
+            else:
+                # Fallback to legacy export
+                exported_path = export_results(results, output_path=output_path, format=output_format)
+                logger.info(f"Results exported successfully to: {exported_path}")
+                print(f"\n✓ Results saved to: {exported_path}")
         
         logger.info("\n" + "="*80)
         logger.info("FORECASTING PIPELINE COMPLETED SUCCESSFULLY")
@@ -547,18 +621,21 @@ def main():
     except FileNotFoundError as e:
         error_msg = f"File Error: {str(e)}"
         logger.error(error_msg)
+        log_exception(logger, e)
         print(f"ERROR: {error_msg}", file=sys.stderr)
         return 1
         
     except ValueError as e:
         error_msg = f"Validation Error: {str(e)}"
         logger.error(error_msg)
+        log_exception(logger, e)
         print(f"ERROR: {error_msg}", file=sys.stderr)
         return 1
         
     except Exception as e:
         error_msg = f"Unexpected Error: {str(e)}"
-        logger.error(error_msg, exc_info=True)
+        logger.error(error_msg)
+        log_exception(logger, e)
         print(f"ERROR: {error_msg}", file=sys.stderr)
         return 1
 

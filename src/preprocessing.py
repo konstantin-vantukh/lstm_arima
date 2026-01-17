@@ -9,6 +9,8 @@ Functions:
     - impute_missing: Forward fill missing values (t with t-1)
     - calculate_returns: Calculate simple returns R_t = (P_t - P_t-1) / P_t-1
     - reshape_for_lstm: Reshape to 3D tensor [Samples, Time Steps, Features]
+
+Error Handling & Logging: Section 10, Error Handling Strategy
 """
 
 import json
@@ -18,10 +20,12 @@ import numpy as np
 from pathlib import Path
 from typing import Union, Tuple
 
+from src.exceptions import DataValidationError, FileIOError
+from src.logger_config import get_logger, log_exception
 
-# Configure logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+
+# Configure module logging
+logger = get_logger(__name__)
 
 
 def load_data(file_path: str) -> pd.DataFrame:
@@ -38,9 +42,8 @@ def load_data(file_path: str) -> pd.DataFrame:
         pd.DataFrame: Loaded data as a DataFrame with price information
 
     Raises:
-        FileNotFoundError: If the file does not exist
-        ValueError: If the file format is not supported (not CSV or JSON)
-        Exception: For JSON parsing or CSV reading errors
+        DataValidationError: If file not found, format unsupported, or empty data
+        FileIOError: For JSON parsing, CSV reading, or I/O errors
 
     Examples:
         >>> data = load_data('data/btc_prices.csv')
@@ -52,7 +55,10 @@ def load_data(file_path: str) -> pd.DataFrame:
     if not file_path.exists():
         error_msg = f"File not found: {file_path}"
         logger.error(error_msg)
-        raise FileNotFoundError(error_msg)
+        raise DataValidationError(
+            error_message=error_msg,
+            file_path=str(file_path)
+        )
 
     # Get file extension
     file_ext = file_path.suffix.lower()
@@ -69,19 +75,42 @@ def load_data(file_path: str) -> pd.DataFrame:
         else:
             error_msg = f"Unsupported file format: {file_ext}. Only CSV and JSON are supported."
             logger.error(error_msg)
-            raise ValueError(error_msg)
+            raise DataValidationError(
+                error_message=error_msg,
+                file_path=str(file_path)
+            )
 
-        logger.info(f"Data shape: {data.shape}")
+        # Validate data is not empty
+        if data.empty:
+            error_msg = f"Loaded data is empty from {file_path}"
+            logger.error(error_msg)
+            raise DataValidationError(
+                error_message=error_msg,
+                file_path=str(file_path),
+                data_shape=data.shape
+            )
+
+        logger.info(f"Loaded {len(data)} rows from {file_path}. Data shape: {data.shape}")
         return data
 
-    except json.JSONDecodeError as e:
-        error_msg = f"JSON parsing error in {file_path}: {str(e)}"
+    except (json.JSONDecodeError, pd.errors.ParserError) as e:
+        error_msg = f"Error parsing {file_ext} file {file_path}: {str(e)}"
         logger.error(error_msg)
-        raise
-    except pd.errors.ParserError as e:
-        error_msg = f"CSV parsing error in {file_path}: {str(e)}"
+        log_exception(logger, e)
+        raise FileIOError(
+            error_message=error_msg,
+            file_path=str(file_path),
+            operation="read"
+        ) from e
+    except Exception as e:
+        error_msg = f"Unexpected error loading {file_path}: {str(e)}"
         logger.error(error_msg)
-        raise
+        log_exception(logger, e)
+        raise FileIOError(
+            error_message=error_msg,
+            file_path=str(file_path),
+            operation="read"
+        ) from e
 
 
 def impute_missing(data: pd.Series) -> pd.Series:
@@ -140,7 +169,7 @@ def calculate_returns(prices: pd.Series) -> pd.Series:
         pd.Series: Calculated returns series (first value is NaN)
 
     Raises:
-        ValueError: If prices contain zero or negative values
+        DataValidationError: If prices contain zero or negative values, or invalid data
 
     Examples:
         >>> prices = pd.Series([100, 102, 101, 103])
@@ -154,14 +183,26 @@ def calculate_returns(prices: pd.Series) -> pd.Series:
     if (prices <= 0).any():
         error_msg = "Price series contains zero or negative values"
         logger.error(error_msg)
-        raise ValueError(error_msg)
+        raise DataValidationError(
+            error_message=error_msg,
+            data_shape=(len(prices),)
+        )
 
-    # Calculate simple returns: (P_t - P_{t-1}) / P_{t-1}
-    returns = prices.pct_change()
-
-    logger.info(f"Returns calculated. Mean: {returns.mean():.6f}, Std: {returns.std():.6f}")
-
-    return returns
+    try:
+        # Calculate simple returns: (P_t - P_{t-1}) / P_{t-1}
+        returns = prices.pct_change()
+        
+        logger.info(f"Returns calculated from {len(prices)} prices. Mean: {returns.mean():.6f}, Std: {returns.std():.6f}")
+        
+        return returns
+    except Exception as e:
+        error_msg = f"Error calculating returns: {str(e)}"
+        logger.error(error_msg)
+        log_exception(logger, e)
+        raise DataValidationError(
+            error_message=error_msg,
+            data_shape=(len(prices),)
+        ) from e
 
 
 def reshape_for_lstm(
