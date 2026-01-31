@@ -18,7 +18,7 @@ import logging
 import numpy as np
 import traceback
 import time
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict, Any, Optional
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
@@ -40,17 +40,16 @@ def build_lstm_model(config: Dict[str, Any], input_shape: Tuple[int, int]) -> ke
     Construct LSTM neural network architecture for residual modeling.
 
     Builds a sequential LSTM model with the following layers:
-    - LSTM layer with gated forget/input/output gates
-    - Dropout layer for regularization (default 0.4)
-    - Dense layer with L2 regularization (default 0.01)
-    - Output layer with tanh activation (handles residual range -2 to 2)
+    - First LSTM layer: 20 nodes, return_sequences=True
+    - Hidden LSTM layer: 10 nodes, return_sequences=False
+    - Dropout layer for regularization (rate configurable in config)
+     - Output Dense layer: units equal to the forecasting horizon, with tanh activation (handles residual range -2 to 2)
 
     Args:
         config (Dict[str, Any]): Model configuration dictionary containing:
-            - hidden_layers (int): Number of LSTM layers (default: 1)
-            - nodes (int): Number of neurons per LSTM layer (default: 10)
-            - dropout_rate (float): Dropout rate (default: 0.4)
-            - l2_regularization (float): L2 regularization coefficient (default: 0.01)
+            - lstm.dropout_rate (float): Dropout rate (default: 0.2)
+            - lstm.l2_regularization (float): L2 regularization coefficient (default: 0.01)
+            - horizon (int): The number of units for the Dense layer (default: 1)
         input_shape (Tuple[int, int]): Shape of input data (window_size, features)
             - First element: number of time steps in window
             - Second element: number of features (univariate = 1)
@@ -59,42 +58,28 @@ def build_lstm_model(config: Dict[str, Any], input_shape: Tuple[int, int]) -> ke
         keras.Model: Compiled Keras Sequential model ready for training
 
     Raises:
-        ValueError: If config parameters are invalid or input_shape is malformed
+        ConfigurationError: If config parameters are invalid or missing
+        ValueError: If input_shape is malformed
         Exception: For any Keras model building failures
 
     Examples:
         >>> config = {
-        ...     'hidden_layers': 1,
-        ...     'nodes': 10,
-        ...     'dropout_rate': 0.4,
-        ...     'l2_regularization': 0.01,
-        ...     'optimizer': 'adam'
+        ...     'lstm': {'dropout_rate': 0.2, 'l2_regularization': 0.01},
+        ...     'horizon': 1
         ... }
-        >>> input_shape = (60, 1)
+        >>> input_shape = (350, 1)  # Example: 350 time steps, 1 feature
         >>> model = build_lstm_model(config, input_shape)
         >>> print(model.summary())
     """
     # Extract configuration parameters with defaults
-    hidden_layers = config.get('hidden_layers', 1)
-    nodes = config.get('nodes', 10)
-    dropout_rate = config.get('dropout_rate', 0.4)
-    l2_reg = config.get('l2_regularization', 0.01)
-    optimizer = config.get('optimizer', 'adam')
+    dropout_rate = config.get('lstm', {}).get('dropout_rate', config.get('dropout_rate', 0.2))
+    l2_reg = config.get('lstm', {}).get('l2_regularization', config.get('l2_regularization', 0.01))
+    # The 'horizon' value is typically passed as a command-line argument,
+    # and we assume it's available in the config dictionary.
+    # Default to 1 for single-step prediction if not found.
+    horizon = config.get('horizon', 1) 
 
     # Validate configuration
-    if hidden_layers < 1:
-        error_msg = f"hidden_layers must be at least 1, got {hidden_layers}"
-        logger.error(error_msg)
-        raise ConfigurationError(
-            error_message=error_msg,
-            parameter_name="hidden_layers",
-            invalid_value=hidden_layers,
-            allowed_range="[1, ∞)"
-        )
-
-    if nodes < 5 or nodes > 20:
-        logger.warning(f"nodes={nodes} is outside recommended range [5, 20]. Using as-is.")
-
     if not (0 <= dropout_rate < 1):
         error_msg = f"dropout_rate must be in [0, 1), got {dropout_rate}"
         logger.error(error_msg)
@@ -114,6 +99,16 @@ def build_lstm_model(config: Dict[str, Any], input_shape: Tuple[int, int]) -> ke
             invalid_value=l2_reg,
             allowed_range="[0, ∞)"
         )
+    
+    if horizon <= 0:
+        error_msg = f"horizon must be positive, got {horizon}"
+        logger.error(error_msg)
+        raise ConfigurationError(
+            error_message=error_msg,
+            parameter_name="horizon",
+            invalid_value=horizon,
+            allowed_range="(0, ∞)"
+        )
 
     # Validate input shape
     if len(input_shape) != 2:
@@ -129,53 +124,46 @@ def build_lstm_model(config: Dict[str, Any], input_shape: Tuple[int, int]) -> ke
 
     try:
         logger.info(
-            f"Building LSTM model: hidden_layers={hidden_layers}, nodes={nodes}, "
-            f"dropout_rate={dropout_rate}, l2_regularization={l2_reg}, input_shape={input_shape}"
+            f"Building LSTM model: dropout_rate={dropout_rate}, l2_regularization={l2_reg}, "
+            f"horizon={horizon}, input_shape={input_shape}"
         )
 
         model = keras.Sequential()
 
-        # LSTM layer with gated structure (forget, input, output gates)
-        # First LSTM layer
+        # First LSTM layer: 20 nodes, return_sequences=True
         model.add(
             LSTM(
-                units=nodes,
-                activation='relu',
+                units=20,
+                activation='tanh',
                 input_shape=input_shape,
-                return_sequences=(hidden_layers > 1)  # Return sequences if more layers follow
+                return_sequences=True
             )
         )
-        logger.debug(f"Added LSTM layer: units={nodes}")
+        logger.debug(f"Added First LSTM layer: units=20, return_sequences=True")
 
-        # Additional LSTM layers if hidden_layers > 1
-        for i in range(1, hidden_layers):
-            return_sequences = (i < hidden_layers - 1)  # Return sequences for all but last
-            model.add(
-                LSTM(
-                    units=nodes,
-                    activation='relu',
-                    return_sequences=return_sequences
-                )
+        # Hidden LSTM layer: 10 nodes, return_sequences=False
+        model.add(
+            LSTM(
+                units=10,
+                activation='tanh',
+                return_sequences=False
             )
-            logger.debug(f"Added LSTM layer {i+1}: units={nodes}")
+        )
+        logger.debug(f"Added Hidden LSTM layer: units=10, return_sequences=False")
 
         # Dropout layer for regularization
         model.add(Dropout(rate=dropout_rate))
         logger.debug(f"Added Dropout layer: rate={dropout_rate}")
 
-        # Dense layer with L2 regularization
+        # Dense layer with L2 regularization, now serving as the output layer
         model.add(
             Dense(
-                units=nodes,
-                activation='relu',
+                units=horizon,
+                activation='tanh',
                 kernel_regularizer=l2(l2_reg)
             )
         )
-        logger.debug(f"Added Dense layer: units={nodes}, l2_regularization={l2_reg}")
-
-        # Output layer with tanh activation to handle residual range [-2, 2]
-        model.add(Dense(units=1, activation='tanh'))
-        logger.debug("Added Output layer: units=1, activation=tanh")
+        logger.debug(f"Added Output Dense layer: units={horizon}, activation=tanh, l2_regularization={l2_reg}")
 
         # Compile model with Adam optimizer
         model.compile(
@@ -197,42 +185,60 @@ def build_lstm_model(config: Dict[str, Any], input_shape: Tuple[int, int]) -> ke
 
 
 def create_rolling_windows(
-    data: np.ndarray, window_size: int
+    data: np.ndarray, config: Optional[Dict[str, Any]] = None, **kwargs
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Generate training sequences using rolling window approach.
+    Generate training sequences using rolling window approach with configurable window size and stride.
 
     Converts a 1D array into training pairs (X, y) suitable for LSTM training.
     X represents input sequences of length window_size, and y represents the
-    next value in the sequence to be predicted.
+    next `horizon` values in the sequence to be predicted.
 
     Args:
         data (np.ndarray): 1D array of residual or sequential data
-        window_size (int): Size of rolling window (number of time steps)
-            - Recommended range: 20-100 (default: 60)
+        config (Dict[str, Any]): Configuration dictionary containing:
+            - lstm.window_size (int): Size of rolling window (number of time steps)
+            - lstm.stride (int): Stride for rolling window (number of steps to advance)
+            - horizon (int): The number of future steps to predict per window
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: Tuple containing:
             - X: 3D array of shape [samples, window_size, 1] - input sequences
-            - y: 1D array of shape [samples] - target values (next time step)
+            - y: 2D array of shape [samples, horizon] - target values (next `horizon` time steps)
 
     Raises:
-        ValueError: If data is invalid or window_size is inappropriate
+        ValueError: If data is invalid or window_size/stride are inappropriate
         TypeError: If data is not a numpy array
+        ConfigurationError: If config parameters are invalid or missing
 
     Examples:
+        >>> config = {'lstm': {'window_size': 3, 'stride': 1}, 'horizon': 2}
         >>> residuals = np.array([-0.1, 0.05, -0.02, 0.08, 0.01, -0.03, 0.04, 0.02])
-        >>> X, y = create_rolling_windows(residuals, window_size=3)
+        >>> X, y = create_rolling_windows(residuals, config)
         >>> X.shape
-        (5, 3, 1)
+        (4, 3, 1)
         >>> y.shape
-        (5,)
-
-    Note:
-        - Recommended window_size range is 20-100 days
-        - Total number of samples = len(data) - window_size
-        - Data should be residuals from ARIMA with range approximately [-2, 2]
+        (4, 2)
     """
+    # Extract configuration parameters with defaults
+    if config is None:
+        config = {}
+    
+    window_size = config.get('lstm', {}).get('window_size', config.get('window_size', kwargs.get('window_size', 350)))
+    stride = config.get('lstm', {}).get('stride', config.get('stride', kwargs.get('stride', 175)))
+    horizon = config.get('horizon', kwargs.get('horizon', 1))  # Get horizon (target prediction length)
+
+    # Validate configuration for horizon
+    if not isinstance(horizon, int) or horizon <= 0:
+        error_msg = f"horizon must be a positive integer, got {horizon}"
+        logger.error(error_msg)
+        raise ConfigurationError(
+            error_message=error_msg,
+            parameter_name="horizon",
+            invalid_value=horizon,
+            allowed_range="(0, ∞)"
+        )
+
     # Validate input type
     if not isinstance(data, np.ndarray):
         error_msg = "Data must be a numpy array"
@@ -246,51 +252,79 @@ def create_rolling_windows(
         raise ValueError(error_msg)
 
     # Validate window size
-    if not isinstance(window_size, int):
-        error_msg = f"window_size must be an integer, got {type(window_size)}"
+    if not isinstance(window_size, int) or window_size <= 0:
+        error_msg = f"window_size must be a positive integer, got {window_size}"
         logger.error(error_msg)
-        raise TypeError(error_msg)
-
-    if window_size <= 0:
-        error_msg = f"window_size must be positive, got {window_size}"
-        logger.error(error_msg)
-        raise ValueError(error_msg)
-
-    if 20 <= window_size <= 100:
-        logger.info(f"window_size={window_size} is within recommended range [20, 100]")
-    else:
-        logger.warning(
-            f"window_size={window_size} is outside recommended range [20, 100]. Using as-is."
+        raise ConfigurationError(
+            error_message=error_msg,
+            parameter_name="lstm.window_size",
+            invalid_value=window_size,
+            allowed_range="(0, ∞)"
         )
 
-    # Check sufficient data
-    if len(data) < window_size + 1:
+    # Validate stride
+    if not isinstance(stride, int) or stride <= 0:
+        error_msg = f"stride must be a positive integer, got {stride}"
+        logger.error(error_msg)
+        raise ConfigurationError(
+            error_message=error_msg,
+            parameter_name="lstm.stride",
+            invalid_value=stride,
+            allowed_range="(0, ∞)"
+        )
+
+    if window_size < stride:
+        error_msg = f"window_size ({window_size}) cannot be less than stride ({stride})"
+        logger.error(error_msg)
+        raise ConfigurationError(
+            error_message=error_msg,
+            parameter_name="lstm.stride",
+            invalid_value=stride,
+            allowed_range=f"(0, {window_size}]"
+        )
+
+    # Check sufficient data for both window and horizon
+    if len(data) < window_size + horizon:
         error_msg = (
-            f"Data length ({len(data)}) must be at least window_size + 1 ({window_size + 1})"
+            f"Data length ({len(data)}) must be at least window_size ({window_size}) "
+            f"+ horizon ({horizon}) for rolling window creation."
         )
         logger.error(error_msg)
         raise ValueError(error_msg)
 
     try:
         logger.info(
-            f"Creating rolling windows: data_length={len(data)}, window_size={window_size}"
+            f"Creating rolling windows: data_length={len(data)}, window_size={window_size}, "
+            f"stride={stride}, horizon={horizon}"
         )
 
         X = []
         y = []
 
         # Generate rolling windows
-        for i in range(len(data) - window_size):
+        for i in range(0, len(data) - window_size - horizon + 1, stride):
             # Extract window of consecutive values and reshape to [window_size, 1]
             window = data[i : i + window_size].reshape(-1, 1)
             X.append(window)
 
-            # Next value is the target
-            y.append(data[i + window_size])
+            # Target is now a sequence of 'horizon' values
+            target_sequence = data[i + window_size : i + window_size + horizon]
+            y.append(target_sequence)
+
+
+        # If X is empty, it means no windows could be formed due to data length or window/stride sizes
+        if not X or not y or len(X) != len(y):
+            error_msg = (
+                f"No valid windows or targets could be created with data length {len(data)}, "
+                f"window_size {window_size}, stride {stride}, and horizon {horizon}. "
+                "Ensure data length is sufficient and configuration allows window formation."
+            )
+            logger.error(error_msg)
+            raise DataValidationError(error_message=error_msg)
 
         # Convert to numpy arrays
         X = np.array(X, dtype=np.float32)
-        y = np.array(y, dtype=np.float32)
+        y = np.array(y, dtype=np.float32) # y is now 2D: [samples, horizon]
 
         num_samples = len(X)
         logger.info(
@@ -318,7 +352,7 @@ def train_lstm(
     Args:
         model (keras.Model): Compiled Keras LSTM model from build_lstm_model
         X (np.ndarray): Training input sequences of shape [samples, window_size, features]
-        y (np.ndarray): Training target values of shape [samples]
+        y (np.ndarray): Training target values of shape [samples, horizon]
         config (Dict[str, Any]): Training configuration containing:
             - batch_size (int): Training batch size (default: 64)
             - epochs (int): Maximum number of training epochs (default: 100)
@@ -384,8 +418,17 @@ def train_lstm(
         logger.error(error_msg)
         raise ValueError(error_msg)
 
-    if len(y.shape) != 1:
-        error_msg = f"y must be 1D array [samples], got shape {y.shape}"
+    if len(y.shape) != 2:
+        error_msg = f"y must be 2D array [samples, horizon], got shape {y.shape}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+
+    # Validate y's second dimension (horizon)
+    horizon = config.get('horizon', 1)
+    if y.shape[1] != horizon:
+        error_msg = (
+            f"Second dimension of y ({y.shape[1]}) must match horizon ({horizon})."
+        )
         logger.error(error_msg)
         raise ValueError(error_msg)
 
@@ -472,7 +515,7 @@ def predict_residuals(model: keras.Model, X: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: Predicted residuals of shape [samples]
             - Values typically in range approximately [-2, 2] due to tanh activation
-            - One prediction per input sequence
+            - One prediction per input sequence (specifically the first step of the multi-step forecast)
 
     Raises:
         ValueError: If X shape is incompatible with model
@@ -516,8 +559,6 @@ def predict_residuals(model: keras.Model, X: np.ndarray) -> np.ndarray:
         # Generate predictions
         predictions = model.predict(X, verbose=0)
 
-        # Flatten to 1D array (model outputs [samples, 1])
-        predictions = predictions.flatten()
 
         logger.info(
             f"Predictions generated: shape={predictions.shape}, "
@@ -525,6 +566,9 @@ def predict_residuals(model: keras.Model, X: np.ndarray) -> np.ndarray:
             f"min={predictions.min():.6f}, max={predictions.max():.6f}"
         )
 
+        # If horizon is 1, squeeze to 1D array for compatibility
+        if predictions.shape[1] == 1:
+            return predictions.squeeze(axis=1)
         return predictions
 
     except Exception as e:

@@ -213,6 +213,10 @@ def run_hybrid_forecast(
         # Extract configuration sections
         arima_config = config.get('arima', {})
         lstm_config = config.get('lstm', {})
+
+        # Ensure that the LSTM config includes the explicit forecast_horizon
+        # for the Dense layer in build_lstm_model in src/lstm_engine.py.
+        lstm_config['horizon'] = forecast_horizon
         
         # ===== STEP 1: DATA PREPROCESSING =====
         logger.info("\n" + "-"*80)
@@ -277,7 +281,8 @@ def run_hybrid_forecast(
         
         # Prepare residuals for LSTM
         residuals_array = residuals.values
-        window_size = lstm_config.get('window_size', 60)
+        window_size = lstm_config.get('window_size', 350)
+        stride = lstm_config.get('stride', 175)
         
         # Check if we have enough data
         if len(residuals_array) < window_size + 1:
@@ -286,10 +291,16 @@ def run_hybrid_forecast(
                 f"Data length: {len(residuals_array)}"
             )
             window_size = max(5, len(residuals_array) // 3)
+            stride = max(1, window_size // 2)
             logger.info(f"Adjusted window_size to {window_size}")
         
+        # Create parameters for rolling windows
+        window_config = dict()
+        window_config['window_size'] = window_size
+        window_config['stride'] = stride
+        window_config['horizon'] = forecast_horizon
         # Create rolling windows
-        X, y = create_rolling_windows(residuals_array, window_size=window_size)
+        X, y = create_rolling_windows(data=residuals_array, config=window_config)
         logger.info(f"Rolling windows created: X shape={X.shape}, y shape={y.shape}")
         
         # Build LSTM model
@@ -307,23 +318,15 @@ def run_hybrid_forecast(
         
         # Generate forecast for future periods
         # Use last window of residuals to predict future residuals
+        # Generate forecast for future periods
+        # Use last window of residuals to predict future residuals directly
         if len(residuals_array) >= window_size:
             last_window = residuals_array[-window_size:]
-            future_residual_forecast = []
-            
-            current_window = last_window.copy().reshape(-1, 1)
-            for step in range(forecast_horizon):
-                # Predict next step
-                prediction = lstm_model.predict(
-                    current_window.reshape(1, window_size, 1), 
-                    verbose=0
-                )[0, 0]
-                future_residual_forecast.append(prediction)
-                
-                # Update window for next step
-                current_window = np.vstack([current_window[1:], [[prediction]]])
-            
-            lstm_forecast = np.array(future_residual_forecast)
+            # Reshape for LSTM model input: (1, window_size, 1)
+            input_for_prediction = last_window.reshape(1, window_size, 1) 
+
+            # Predict entire forecast horizon at once
+            lstm_forecast = lstm_model.predict(input_for_prediction, verbose=0)[0]
         else:
             lstm_forecast = np.zeros(forecast_horizon)
         
@@ -389,7 +392,7 @@ def run_hybrid_forecast(
             
             # Returns space metrics (compare actual vs fitted returns)
             arima_fitted = arima_model.fittedvalues.values[:len(lstm_residual_predictions)]
-            hybrid_fitted = arima_fitted + lstm_residual_predictions
+            hybrid_fitted = arima_fitted + lstm_residual_predictions[:, 0]
             actual_returns = returns.values[:len(lstm_residual_predictions)]
             
             rmse_returns = calculate_rmse(actual_returns, hybrid_fitted)

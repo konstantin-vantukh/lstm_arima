@@ -3492,3 +3492,1151 @@ Exporting dual-space results to CSV...
 ================================================================================
 [2026-01-17T03:02:38] [INFO] [__main__] - FORECASTING PIPELINE COMPLETED SUCCESSFULLY
 [2026-01-17T03:02:38] [INFO] [__main__] - ================================================================================
+[2026-01-22T23:25:50] [INFO] [root] - Logging configured: level=INFO, file=output/run.log
+[2026-01-22T23:25:50] [INFO] [__main__] - Command-line arguments parsed
+[2026-01-22T23:25:50] [INFO] [__main__] -   Input: .\data\sample\BTC_USDT.csv
+[2026-01-22T23:25:50] [INFO] [__main__] -   Ticker: BTC
+[2026-01-22T23:25:50] [INFO] [__main__] -   Horizon: 5
+[2026-01-22T23:25:50] [INFO] [__main__] -   Output: .\output\forecast_20260123_000000.csv
+[2026-01-22T23:25:50] [INFO] [__main__] -   Config: default
+[2026-01-22T23:25:50] [INFO] [__main__] - All CLI arguments validated successfully
+[2026-01-22T23:25:50] [INFO] [src.config_loader] - Loading configuration from config\model_params.yml
+[2026-01-22T23:25:50] [INFO] [src.config_loader] - Successfully loaded configuration from config\model_params.yml
+[2026-01-22T23:25:50] [INFO] [src.config_loader] - Configuration validation successful
+[2026-01-22T23:25:50] [INFO] [src.config_loader] - Configuration loaded and validated successfully
+[2026-01-22T23:25:50] [INFO] [__main__] - Loaded default configuration
+[2026-01-22T23:25:50] [INFO] [__main__] - 
+Loading data from .\data\sample\BTC_USDT.csv
+[2026-01-22T23:25:50] [INFO] [src.preprocessing] - Loading CSV data from data\sample\BTC_USDT.csv
+[2026-01-22T23:25:51] [INFO] [src.preprocessing] - Loaded 181083 rows from data\sample\BTC_USDT.csv. Data shape: (181083, 6)
+[2026-01-22T23:25:51] [INFO] [__main__] - Data loaded successfully: shape=(181083, 6)
+[2026-01-22T23:25:51] [INFO] [__main__] - 
+Starting hybrid forecasting workflow...
+[2026-01-22T23:25:51] [INFO] [__main__] - ================================================================================
+[2026-01-22T23:25:51] [INFO] [__main__] - STARTING HYBRID FORECAST WORKFLOW
+[2026-01-22T23:25:51] [INFO] [__main__] - ================================================================================
+[2026-01-22T23:25:51] [INFO] [__main__] - Using provided configuration
+[2026-01-22T23:25:51] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-22T23:25:51] [INFO] [__main__] - STEP 1: DATA PREPROCESSING
+[2026-01-22T23:25:51] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-22T23:25:51] [INFO] [__main__] - Extracted price series: 181083 data points
+[2026-01-22T23:25:51] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 0
+[2026-01-22T23:25:51] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-22T23:25:51] [INFO] [src.preprocessing] - Calculating returns from price series of length 181083
+[2026-01-22T23:25:51] [INFO] [src.preprocessing] - Returns calculated from 181083 prices. Mean: 0.000000, Std: 0.000498
+[2026-01-22T23:25:51] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 1
+[2026-01-22T23:25:51] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-22T23:25:51] [INFO] [__main__] - Returns calculated: mean=0.000000, std=0.000498
+[2026-01-22T23:25:51] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-22T23:25:51] [INFO] [__main__] - STEP 2: ARIMA LINEAR COMPONENT
+[2026-01-22T23:25:51] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-22T23:25:51] [INFO] [src.arima_engine] - Performing ADF test on returns series of length 181083
+[2026-01-22T23:28:11] [INFO] [src.arima_engine] - ADF test: statistic=-47.803590, p-value=0.000000, stationary=True
+[2026-01-22T23:28:11] [INFO] [__main__] - Stationarity test: stationary=True, p-value=0.000000
+[2026-01-22T23:28:11] [INFO] [src.arima_engine] - Starting auto-ARIMA search. Max P: 5, Max D: 2, Max Q: 5, Series length: 181083
+[2026-01-23T01:53:42] [INFO] [src.arima_engine] - Optimal ARIMA order found: (5, 0, 5) with AIC: -2240454.6214
+[2026-01-23T01:53:42] [INFO] [__main__] - Optimal ARIMA order: (5, 0, 5)
+[2026-01-23T01:53:42] [INFO] [src.arima_engine] - Fitting ARIMA model with order (5, 0, 5) on returns series of length 181083
+[2026-01-23T01:56:20] [INFO] [src.arima_engine] - ARIMA model fitted successfully with order (5, 0, 5). AIC: -2240454.6214, BIC: -2240333.3409
+[2026-01-23T01:56:20] [INFO] [src.arima_engine] - Extracting residuals from ARIMA model
+[2026-01-23T01:56:20] [INFO] [src.arima_engine] - Residuals extracted. Length: 181083, Mean: -0.000000, Std: 0.000498, Min: -0.042013, Max: 0.023861
+[2026-01-23T01:56:20] [INFO] [__main__] - Residuals extracted: mean=-0.000000, std=0.000498
+[2026-01-23T01:56:20] [INFO] [__main__] - ARIMA forecast generated: 5 period(s)
+[2026-01-23T01:56:20] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-23T01:56:20] [INFO] [__main__] - STEP 3: LSTM NON-LINEAR COMPONENT
+[2026-01-23T01:56:20] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-23T01:56:20] [INFO] [src.lstm_engine] - window_size=60 is within recommended range [20, 100]
+[2026-01-23T01:56:20] [INFO] [src.lstm_engine] - Creating rolling windows: data_length=181083, window_size=60
+[2026-01-23T01:56:21] [INFO] [src.lstm_engine] - Rolling windows created: X shape=(181023, 60, 1), y shape=(181023,), num_samples=181023
+[2026-01-23T01:56:21] [INFO] [__main__] - Rolling windows created: X shape=(181023, 60, 1), y shape=(181023,)
+[2026-01-23T01:56:21] [INFO] [src.lstm_engine] - Building LSTM model: hidden_layers=1, nodes=10, dropout_rate=0.4, l2_regularization=0.01, input_shape=(60, 1)
+[2026-01-23T01:56:21] [INFO] [src.lstm_engine] - Model compiled successfully with Adam optimizer, MSE loss, MAE metric
+[2026-01-23T01:56:21] [INFO] [__main__] - LSTM model built successfully
+[2026-01-23T01:56:21] [INFO] [src.lstm_engine] - Starting LSTM training: batch_size=64, epochs=100, early_stopping_patience=10, training_samples=181023
+[2026-01-23T02:12:43] [INFO] [src.lstm_engine] - LSTM training completed. Final loss=0.000000, final val_loss=0.000001, final mae=0.000298, epochs_trained=15
+[2026-01-23T02:12:43] [INFO] [__main__] - LSTM model training completed
+[2026-01-23T02:12:43] [INFO] [src.lstm_engine] - Generating predictions for 181023 samples
+[2026-01-23T02:13:14] [INFO] [src.lstm_engine] - Predictions generated: shape=(181023,), mean=0.000007, std=0.000000, min=0.000007, max=0.000007
+[2026-01-23T02:13:14] [INFO] [__main__] - LSTM residual predictions: 181023 values
+[2026-01-23T02:13:14] [INFO] [__main__] - LSTM forecast generated: 5 period(s)
+[2026-01-23T02:13:14] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-23T02:13:14] [INFO] [__main__] - STEP 4: HYBRID COMBINATION
+[2026-01-23T02:13:14] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-23T02:13:14] [WARNING] [src.hybrid_combiner] - combine_predictions() is deprecated. Use combine_forecasts() instead. Parameter 'lstm_residual_forecast' has been renamed to 'lstm_forecast'.
+[2026-01-23T02:13:14] [INFO] [src.hybrid_combiner] - Combining predictions: arima_shape=(5,), lstm_shape=(5,)
+[2026-01-23T02:13:14] [INFO] [src.hybrid_combiner] - Component statistics calculated: arima_mean=-0.000001, lstm_mean=0.000007, arima_contribution=100.00%, lstm_contribution=0.00%
+[2026-01-23T02:13:14] [INFO] [src.hybrid_combiner] - Hybrid combination successful. Final predictions shape: (5,)
+[2026-01-23T02:13:14] [INFO] [__main__] - Hybrid predictions generated: 5 values
+[2026-01-23T02:13:14] [INFO] [__main__] - Component contributions: ARIMA=100.00%, LSTM=0.00%
+[2026-01-23T02:13:14] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-23T02:13:14] [INFO] [__main__] - STEP 5: PRICE RECONSTRUCTION (RETURNS → PRICE SPACE)
+[2026-01-23T02:13:14] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-23T02:13:14] [INFO] [__main__] - Last observed price: $109540.30
+[2026-01-23T02:13:14] [INFO] [src.price_converter] - Reconstructing price series: last_price=109540.300000, forecast_length=5
+[2026-01-23T02:13:14] [INFO] [src.price_converter] - Price series reconstruction completed: initial_price=109540.300000, final_price=109544.006440, min_price=109541.190329, max_price=109544.006440
+[2026-01-23T02:13:14] [INFO] [__main__] - Price reconstruction successful
+[2026-01-23T02:13:14] [INFO] [__main__] -   Price range: $109541.19 - $109544.01
+[2026-01-23T02:13:14] [INFO] [src.price_converter] - Validating reconstructed prices: length=5
+[2026-01-23T02:13:14] [INFO] [src.price_converter] - Price validation complete: is_valid=True, has_negative=False, has_nan=False, has_inf=False
+[2026-01-23T02:13:14] [INFO] [src.price_converter] - All prices valid: range $109541.19 - $109544.01
+[2026-01-23T02:13:14] [INFO] [src.price_converter] - Statistics: mean=$109542.51, std=$1.08, median=$109542.65
+[2026-01-23T02:13:14] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-23T02:13:14] [INFO] [__main__] - STEP 6: EVALUATION AND METRICS (DUAL-SPACE)
+[2026-01-23T02:13:14] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-23T02:13:14] [INFO] [src.evaluation] - RMSE calculated: 0.000498
+[2026-01-23T02:13:14] [INFO] [src.evaluation] - MAE calculated: 0.000305
+[2026-01-23T02:13:14] [INFO] [__main__] - Returns Space Metrics (Historical Validation):
+[2026-01-23T02:13:14] [INFO] [__main__] -   RMSE: 0.000498
+[2026-01-23T02:13:14] [INFO] [__main__] -   MAE: 0.000305
+[2026-01-23T02:13:14] [INFO] [src.price_converter] - Reconstructing price series: last_price=106990.000000, forecast_length=181023
+[2026-01-23T02:13:19] [INFO] [src.price_converter] - Price series reconstruction completed: initial_price=106990.000000, final_price=419866.192506, min_price=106990.808084, max_price=419866.192506
+[2026-01-23T02:13:19] [INFO] [src.evaluation] - RMSE calculated: 145561.920835
+[2026-01-23T02:13:19] [INFO] [src.evaluation] - MAE calculated: 114721.066462
+[2026-01-23T02:13:19] [INFO] [__main__] - Price Space Metrics (Historical Validation):
+[2026-01-23T02:13:19] [INFO] [__main__] -   RMSE: $145561.92
+[2026-01-23T02:13:19] [INFO] [__main__] -   MAE: $114721.07
+[2026-01-23T02:13:19] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-23T02:13:19] [INFO] [__main__] - BUILDING RESULTS DICTIONARY (DUAL-SPACE OUTPUT)
+[2026-01-23T02:13:19] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-23T02:13:19] [INFO] [__main__] - 
+================================================================================
+[2026-01-23T02:13:19] [INFO] [__main__] - HYBRID FORECAST WORKFLOW COMPLETED SUCCESSFULLY
+[2026-01-23T02:13:19] [INFO] [__main__] - ================================================================================
+[2026-01-23T02:13:19] [INFO] [src.output_manager] - Formatting results summary
+[2026-01-23T02:13:19] [INFO] [src.output_manager] - Results summary formatted successfully
+[2026-01-23T02:13:19] [INFO] [__main__] - 
+Exporting dual-space results to CSV...
+[2026-01-23T02:13:19] [INFO] [src.output_manager] - Output path validated: output
+[2026-01-23T02:13:19] [INFO] [src.output_manager] - CSV export successful: output\forecast_20260123_000000.csv (5 predictions)
+[2026-01-23T02:13:19] [INFO] [__main__] - Results exported successfully to: .\output\forecast_20260123_000000.csv
+[2026-01-23T02:13:19] [INFO] [__main__] - 
+================================================================================
+[2026-01-23T02:13:19] [INFO] [__main__] - FORECASTING PIPELINE COMPLETED SUCCESSFULLY
+[2026-01-23T02:13:19] [INFO] [__main__] - ================================================================================
+[2026-01-28T20:12:52] [INFO] [root] - Logging configured: level=INFO, file=output/run.log
+[2026-01-28T20:12:52] [INFO] [__main__] - Command-line arguments parsed
+[2026-01-28T20:12:52] [INFO] [__main__] -   Input: .\data\sample\BTC_USDT.csv
+[2026-01-28T20:12:52] [INFO] [__main__] -   Ticker: BTC
+[2026-01-28T20:12:52] [INFO] [__main__] -   Horizon: 5
+[2026-01-28T20:12:52] [INFO] [__main__] -   Output: .\output\forecast_20260128_000000.csv
+[2026-01-28T20:12:52] [INFO] [__main__] -   Config: default
+[2026-01-28T20:12:52] [INFO] [__main__] - All CLI arguments validated successfully
+[2026-01-28T20:12:52] [INFO] [src.config_loader] - Loading configuration from config\model_params.yml
+[2026-01-28T20:12:52] [INFO] [src.config_loader] - Successfully loaded configuration from config\model_params.yml
+[2026-01-28T20:12:52] [INFO] [src.config_loader] - Configuration validation successful
+[2026-01-28T20:12:52] [INFO] [src.config_loader] - Configuration loaded and validated successfully
+[2026-01-28T20:12:52] [INFO] [__main__] - Loaded default configuration
+[2026-01-28T20:12:52] [INFO] [__main__] - 
+Loading data from .\data\sample\BTC_USDT.csv
+[2026-01-28T20:12:52] [INFO] [src.preprocessing] - Loading CSV data from data\sample\BTC_USDT.csv
+[2026-01-28T20:12:52] [INFO] [src.preprocessing] - Loaded 181083 rows from data\sample\BTC_USDT.csv. Data shape: (181083, 6)
+[2026-01-28T20:12:52] [INFO] [__main__] - Data loaded successfully: shape=(181083, 6)
+[2026-01-28T20:12:52] [INFO] [__main__] - 
+Starting hybrid forecasting workflow...
+[2026-01-28T20:12:52] [INFO] [__main__] - ================================================================================
+[2026-01-28T20:12:52] [INFO] [__main__] - STARTING HYBRID FORECAST WORKFLOW
+[2026-01-28T20:12:52] [INFO] [__main__] - ================================================================================
+[2026-01-28T20:12:52] [INFO] [__main__] - Using provided configuration
+[2026-01-28T20:12:52] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-28T20:12:52] [INFO] [__main__] - STEP 1: DATA PREPROCESSING
+[2026-01-28T20:12:52] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-28T20:12:52] [INFO] [__main__] - Extracted price series: 181083 data points
+[2026-01-28T20:12:52] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 0
+[2026-01-28T20:12:52] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-28T20:12:52] [INFO] [src.preprocessing] - Calculating returns from price series of length 181083
+[2026-01-28T20:12:52] [INFO] [src.preprocessing] - Returns calculated from 181083 prices. Mean: 0.000000, Std: 0.000498
+[2026-01-28T20:12:52] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 1
+[2026-01-28T20:12:52] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-28T20:12:52] [INFO] [__main__] - Returns calculated: mean=0.000000, std=0.000498
+[2026-01-28T20:12:52] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-28T20:12:52] [INFO] [__main__] - STEP 2: ARIMA LINEAR COMPONENT
+[2026-01-28T20:12:52] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-28T20:12:52] [INFO] [src.arima_engine] - Performing ADF test on returns series of length 181083
+[2026-01-28T20:14:36] [INFO] [src.arima_engine] - ADF test: statistic=-47.803590, p-value=0.000000, stationary=True
+[2026-01-28T20:14:36] [INFO] [__main__] - Stationarity test: stationary=True, p-value=0.000000
+[2026-01-28T20:14:36] [INFO] [src.arima_engine] - Starting auto-ARIMA search. Max P: 5, Max D: 2, Max Q: 5, Series length: 181083
+[2026-01-28T22:35:58] [INFO] [src.arima_engine] - Optimal ARIMA order found: (5, 0, 5) with AIC: -2240454.6214
+[2026-01-28T22:35:58] [INFO] [__main__] - Optimal ARIMA order: (5, 0, 5)
+[2026-01-28T22:35:58] [INFO] [src.arima_engine] - Fitting ARIMA model with order (5, 0, 5) on returns series of length 181083
+[2026-01-28T22:38:32] [INFO] [src.arima_engine] - ARIMA model fitted successfully with order (5, 0, 5). AIC: -2240454.6214, BIC: -2240333.3409
+[2026-01-28T22:38:32] [INFO] [src.arima_engine] - Extracting residuals from ARIMA model
+[2026-01-28T22:38:32] [INFO] [src.arima_engine] - Residuals extracted. Length: 181083, Mean: -0.000000, Std: 0.000498, Min: -0.042013, Max: 0.023861
+[2026-01-28T22:38:32] [INFO] [__main__] - Residuals extracted: mean=-0.000000, std=0.000498
+[2026-01-28T22:38:32] [INFO] [__main__] - ARIMA forecast generated: 5 period(s)
+[2026-01-28T22:38:32] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-28T22:38:32] [INFO] [__main__] - STEP 3: LSTM NON-LINEAR COMPONENT
+[2026-01-28T22:38:32] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-28T22:38:32] [ERROR] [__main__] - Hybrid forecast workflow failed: create_rolling_windows() got an unexpected keyword argument 'window_size'
+[2026-01-28T22:38:32] [ERROR] [__main__] - Exception occurred: TypeError
+Message: create_rolling_windows() got an unexpected keyword argument 'window_size'
+Traceback:
+Traceback (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 296, in run_hybrid_forecast
+    X, y = create_rolling_windows(residuals_array, window_size=window_size)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: create_rolling_windows() got an unexpected keyword argument 'window_size'
+
+[2026-01-28T22:38:32] [ERROR] [__main__] - Unexpected Error: create_rolling_windows() got an unexpected keyword argument 'window_size'
+[2026-01-28T22:38:32] [ERROR] [__main__] - Exception occurred: TypeError
+Message: create_rolling_windows() got an unexpected keyword argument 'window_size'
+Traceback:
+Traceback (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 535, in main
+    results = run_hybrid_forecast(data, forecast_horizon=args.horizon, config=config)
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 296, in run_hybrid_forecast
+    X, y = create_rolling_windows(residuals_array, window_size=window_size)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: create_rolling_windows() got an unexpected keyword argument 'window_size'
+
+[2026-01-29T09:00:22] [INFO] [root] - Logging configured: level=INFO, file=output/run.log
+[2026-01-29T09:00:22] [INFO] [__main__] - Command-line arguments parsed
+[2026-01-29T09:00:22] [INFO] [__main__] -   Input: .\data\sample\BTC_USDT.csv
+[2026-01-29T09:00:22] [INFO] [__main__] -   Ticker: BTC
+[2026-01-29T09:00:22] [INFO] [__main__] -   Horizon: 5
+[2026-01-29T09:00:22] [INFO] [__main__] -   Output: .\output\forecast_20260128_000000.csv
+[2026-01-29T09:00:22] [INFO] [__main__] -   Config: default
+[2026-01-29T09:00:22] [INFO] [__main__] - All CLI arguments validated successfully
+[2026-01-29T09:00:22] [INFO] [src.config_loader] - Loading configuration from config\model_params.yml
+[2026-01-29T09:00:22] [INFO] [src.config_loader] - Successfully loaded configuration from config\model_params.yml
+[2026-01-29T09:00:22] [INFO] [src.config_loader] - Configuration validation successful
+[2026-01-29T09:00:22] [INFO] [src.config_loader] - Configuration loaded and validated successfully
+[2026-01-29T09:00:22] [INFO] [__main__] - Loaded default configuration
+[2026-01-29T09:00:22] [INFO] [__main__] - 
+Loading data from .\data\sample\BTC_USDT.csv
+[2026-01-29T09:00:22] [INFO] [src.preprocessing] - Loading CSV data from data\sample\BTC_USDT.csv
+[2026-01-29T09:00:22] [INFO] [src.preprocessing] - Loaded 181083 rows from data\sample\BTC_USDT.csv. Data shape: (181083, 6)
+[2026-01-29T09:00:22] [INFO] [__main__] - Data loaded successfully: shape=(181083, 6)
+[2026-01-29T09:00:22] [INFO] [__main__] - 
+Starting hybrid forecasting workflow...
+[2026-01-29T09:00:22] [INFO] [__main__] - ================================================================================
+[2026-01-29T09:00:22] [INFO] [__main__] - STARTING HYBRID FORECAST WORKFLOW
+[2026-01-29T09:00:22] [INFO] [__main__] - ================================================================================
+[2026-01-29T09:00:22] [INFO] [__main__] - Using provided configuration
+[2026-01-29T09:00:22] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T09:00:22] [INFO] [__main__] - STEP 1: DATA PREPROCESSING
+[2026-01-29T09:00:22] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T09:00:22] [INFO] [__main__] - Extracted price series: 181083 data points
+[2026-01-29T09:00:22] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 0
+[2026-01-29T09:00:22] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-29T09:00:22] [INFO] [src.preprocessing] - Calculating returns from price series of length 181083
+[2026-01-29T09:00:23] [INFO] [src.preprocessing] - Returns calculated from 181083 prices. Mean: 0.000000, Std: 0.000498
+[2026-01-29T09:00:23] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 1
+[2026-01-29T09:00:23] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-29T09:00:23] [INFO] [__main__] - Returns calculated: mean=0.000000, std=0.000498
+[2026-01-29T09:00:23] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T09:00:23] [INFO] [__main__] - STEP 2: ARIMA LINEAR COMPONENT
+[2026-01-29T09:00:23] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T09:00:23] [INFO] [src.arima_engine] - Performing ADF test on returns series of length 181083
+[2026-01-29T09:02:30] [INFO] [src.arima_engine] - ADF test: statistic=-47.803590, p-value=0.000000, stationary=True
+[2026-01-29T09:02:30] [INFO] [__main__] - Stationarity test: stationary=True, p-value=0.000000
+[2026-01-29T09:02:30] [INFO] [src.arima_engine] - Starting auto-ARIMA search. Max P: 5, Max D: 2, Max Q: 5, Series length: 181083
+[2026-01-29T11:24:56] [INFO] [src.arima_engine] - Optimal ARIMA order found: (5, 0, 5) with AIC: -2240454.6214
+[2026-01-29T11:24:56] [INFO] [__main__] - Optimal ARIMA order: (5, 0, 5)
+[2026-01-29T11:24:56] [INFO] [src.arima_engine] - Fitting ARIMA model with order (5, 0, 5) on returns series of length 181083
+[2026-01-29T11:27:31] [INFO] [src.arima_engine] - ARIMA model fitted successfully with order (5, 0, 5). AIC: -2240454.6214, BIC: -2240333.3409
+[2026-01-29T11:27:31] [INFO] [src.arima_engine] - Extracting residuals from ARIMA model
+[2026-01-29T11:27:31] [INFO] [src.arima_engine] - Residuals extracted. Length: 181083, Mean: -0.000000, Std: 0.000498, Min: -0.042013, Max: 0.023861
+[2026-01-29T11:27:31] [INFO] [__main__] - Residuals extracted: mean=-0.000000, std=0.000498
+[2026-01-29T11:27:31] [INFO] [__main__] - ARIMA forecast generated: 5 period(s)
+[2026-01-29T11:27:31] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T11:27:31] [INFO] [__main__] - STEP 3: LSTM NON-LINEAR COMPONENT
+[2026-01-29T11:27:31] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T11:27:31] [ERROR] [__main__] - Hybrid forecast workflow failed: Type Dict cannot be instantiated; use dict() instead
+[2026-01-29T11:27:31] [ERROR] [__main__] - Exception occurred: TypeError
+Message: Type Dict cannot be instantiated; use dict() instead
+Traceback:
+Traceback (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 298, in run_hybrid_forecast
+    window_config = Dict()
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\typing.py", line 1315, in __call__
+    raise TypeError(f"Type {self._name} cannot be instantiated; "
+                    f"use {self.__origin__.__name__}() instead")
+TypeError: Type Dict cannot be instantiated; use dict() instead
+
+[2026-01-29T11:27:31] [ERROR] [__main__] - Unexpected Error: Type Dict cannot be instantiated; use dict() instead
+[2026-01-29T11:27:31] [ERROR] [__main__] - Exception occurred: TypeError
+Message: Type Dict cannot be instantiated; use dict() instead
+Traceback:
+Traceback (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 541, in main
+    results = run_hybrid_forecast(data, forecast_horizon=args.horizon, config=config)
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 298, in run_hybrid_forecast
+    window_config = Dict()
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\typing.py", line 1315, in __call__
+    raise TypeError(f"Type {self._name} cannot be instantiated; "
+                    f"use {self.__origin__.__name__}() instead")
+TypeError: Type Dict cannot be instantiated; use dict() instead
+
+[2026-01-29T11:28:48] [INFO] [root] - Logging configured: level=INFO, file=output/run.log
+[2026-01-29T11:28:48] [INFO] [__main__] - Command-line arguments parsed
+[2026-01-29T11:28:48] [INFO] [__main__] -   Input: .\data\sample\BTC_USDT.csv
+[2026-01-29T11:28:48] [INFO] [__main__] -   Ticker: BTC
+[2026-01-29T11:28:48] [INFO] [__main__] -   Horizon: 5
+[2026-01-29T11:28:48] [INFO] [__main__] -   Output: .\output\forecast_20260128_000000.csv
+[2026-01-29T11:28:48] [INFO] [__main__] -   Config: default
+[2026-01-29T11:28:48] [INFO] [__main__] - All CLI arguments validated successfully
+[2026-01-29T11:28:48] [INFO] [src.config_loader] - Loading configuration from config\model_params.yml
+[2026-01-29T11:28:48] [INFO] [src.config_loader] - Successfully loaded configuration from config\model_params.yml
+[2026-01-29T11:28:48] [INFO] [src.config_loader] - Configuration validation successful
+[2026-01-29T11:28:48] [INFO] [src.config_loader] - Configuration loaded and validated successfully
+[2026-01-29T11:28:48] [INFO] [__main__] - Loaded default configuration
+[2026-01-29T11:28:48] [INFO] [__main__] - 
+Loading data from .\data\sample\BTC_USDT.csv
+[2026-01-29T11:28:48] [INFO] [src.preprocessing] - Loading CSV data from data\sample\BTC_USDT.csv
+[2026-01-29T11:28:49] [INFO] [src.preprocessing] - Loaded 181083 rows from data\sample\BTC_USDT.csv. Data shape: (181083, 6)
+[2026-01-29T11:28:49] [INFO] [__main__] - Data loaded successfully: shape=(181083, 6)
+[2026-01-29T11:28:49] [INFO] [__main__] - 
+Starting hybrid forecasting workflow...
+[2026-01-29T11:28:49] [INFO] [__main__] - ================================================================================
+[2026-01-29T11:28:49] [INFO] [__main__] - STARTING HYBRID FORECAST WORKFLOW
+[2026-01-29T11:28:49] [INFO] [__main__] - ================================================================================
+[2026-01-29T11:28:49] [INFO] [__main__] - Using provided configuration
+[2026-01-29T11:28:49] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T11:28:49] [INFO] [__main__] - STEP 1: DATA PREPROCESSING
+[2026-01-29T11:28:49] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T11:28:49] [INFO] [__main__] - Extracted price series: 181083 data points
+[2026-01-29T11:28:49] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 0
+[2026-01-29T11:28:49] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-29T11:28:49] [INFO] [src.preprocessing] - Calculating returns from price series of length 181083
+[2026-01-29T11:28:49] [INFO] [src.preprocessing] - Returns calculated from 181083 prices. Mean: 0.000000, Std: 0.000498
+[2026-01-29T11:28:49] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 1
+[2026-01-29T11:28:49] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-29T11:28:49] [INFO] [__main__] - Returns calculated: mean=0.000000, std=0.000498
+[2026-01-29T11:28:49] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T11:28:49] [INFO] [__main__] - STEP 2: ARIMA LINEAR COMPONENT
+[2026-01-29T11:28:49] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T11:28:49] [INFO] [src.arima_engine] - Performing ADF test on returns series of length 181083
+[2026-01-29T11:29:23] [INFO] [root] - Logging configured: level=INFO, file=output/run.log
+[2026-01-29T11:29:23] [INFO] [__main__] - Command-line arguments parsed
+[2026-01-29T11:29:23] [INFO] [__main__] -   Input: .\data\sample\BTC_USDT.csv
+[2026-01-29T11:29:23] [INFO] [__main__] -   Ticker: BTC
+[2026-01-29T11:29:23] [INFO] [__main__] -   Horizon: 5
+[2026-01-29T11:29:23] [INFO] [__main__] -   Output: .\output\forecast_20260128_000000.csv
+[2026-01-29T11:29:23] [INFO] [__main__] -   Config: default
+[2026-01-29T11:29:23] [INFO] [__main__] - All CLI arguments validated successfully
+[2026-01-29T11:29:23] [INFO] [src.config_loader] - Loading configuration from config\model_params.yml
+[2026-01-29T11:29:23] [INFO] [src.config_loader] - Successfully loaded configuration from config\model_params.yml
+[2026-01-29T11:29:23] [INFO] [src.config_loader] - Configuration validation successful
+[2026-01-29T11:29:23] [INFO] [src.config_loader] - Configuration loaded and validated successfully
+[2026-01-29T11:29:23] [INFO] [__main__] - Loaded default configuration
+[2026-01-29T11:29:23] [INFO] [__main__] - 
+Loading data from .\data\sample\BTC_USDT.csv
+[2026-01-29T11:29:23] [INFO] [src.preprocessing] - Loading CSV data from data\sample\BTC_USDT.csv
+[2026-01-29T11:29:23] [INFO] [src.preprocessing] - Loaded 181083 rows from data\sample\BTC_USDT.csv. Data shape: (181083, 6)
+[2026-01-29T11:29:23] [INFO] [__main__] - Data loaded successfully: shape=(181083, 6)
+[2026-01-29T11:29:23] [INFO] [__main__] - 
+Starting hybrid forecasting workflow...
+[2026-01-29T11:29:23] [INFO] [__main__] - ================================================================================
+[2026-01-29T11:29:23] [INFO] [__main__] - STARTING HYBRID FORECAST WORKFLOW
+[2026-01-29T11:29:23] [INFO] [__main__] - ================================================================================
+[2026-01-29T11:29:23] [INFO] [__main__] - Using provided configuration
+[2026-01-29T11:29:23] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T11:29:23] [INFO] [__main__] - STEP 1: DATA PREPROCESSING
+[2026-01-29T11:29:23] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T11:29:23] [INFO] [__main__] - Extracted price series: 181083 data points
+[2026-01-29T11:29:23] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 0
+[2026-01-29T11:29:23] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-29T11:29:23] [INFO] [src.preprocessing] - Calculating returns from price series of length 181083
+[2026-01-29T11:29:23] [INFO] [src.preprocessing] - Returns calculated from 181083 prices. Mean: 0.000000, Std: 0.000498
+[2026-01-29T11:29:23] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 1
+[2026-01-29T11:29:23] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-29T11:29:23] [INFO] [__main__] - Returns calculated: mean=0.000000, std=0.000498
+[2026-01-29T11:29:23] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T11:29:23] [INFO] [__main__] - STEP 2: ARIMA LINEAR COMPONENT
+[2026-01-29T11:29:23] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T11:29:23] [INFO] [src.arima_engine] - Performing ADF test on returns series of length 181083
+[2026-01-29T11:31:09] [INFO] [src.arima_engine] - ADF test: statistic=-47.803590, p-value=0.000000, stationary=True
+[2026-01-29T11:31:09] [INFO] [__main__] - Stationarity test: stationary=True, p-value=0.000000
+[2026-01-29T11:31:09] [INFO] [src.arima_engine] - Starting auto-ARIMA search. Max P: 5, Max D: 2, Max Q: 5, Series length: 181083
+[2026-01-29T13:53:35] [INFO] [src.arima_engine] - Optimal ARIMA order found: (5, 0, 5) with AIC: -2240454.6214
+[2026-01-29T13:53:35] [INFO] [__main__] - Optimal ARIMA order: (5, 0, 5)
+[2026-01-29T13:53:35] [INFO] [src.arima_engine] - Fitting ARIMA model with order (5, 0, 5) on returns series of length 181083
+[2026-01-29T13:56:11] [INFO] [src.arima_engine] - ARIMA model fitted successfully with order (5, 0, 5). AIC: -2240454.6214, BIC: -2240333.3409
+[2026-01-29T13:56:11] [INFO] [src.arima_engine] - Extracting residuals from ARIMA model
+[2026-01-29T13:56:11] [INFO] [src.arima_engine] - Residuals extracted. Length: 181083, Mean: -0.000000, Std: 0.000498, Min: -0.042013, Max: 0.023861
+[2026-01-29T13:56:11] [INFO] [__main__] - Residuals extracted: mean=-0.000000, std=0.000498
+[2026-01-29T13:56:11] [INFO] [__main__] - ARIMA forecast generated: 5 period(s)
+[2026-01-29T13:56:11] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T13:56:11] [INFO] [__main__] - STEP 3: LSTM NON-LINEAR COMPONENT
+[2026-01-29T13:56:11] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T13:56:11] [INFO] [src.lstm_engine] - Creating rolling windows: data_length=181083, window_size=350, stride=175
+[2026-01-29T13:56:11] [INFO] [src.lstm_engine] - Rolling windows created: X shape=(1033, 350, 1), y shape=(1033,), num_samples=1033
+[2026-01-29T13:56:11] [INFO] [__main__] - Rolling windows created: X shape=(1033, 350, 1), y shape=(1033,)
+[2026-01-29T13:56:11] [INFO] [src.lstm_engine] - Building LSTM model: dropout_rate=0.2, l2_regularization=0.01, horizon=5, input_shape=(350, 1)
+[2026-01-29T13:56:12] [INFO] [src.lstm_engine] - Model compiled successfully with Adam optimizer, MSE loss, MAE metric
+[2026-01-29T13:56:12] [INFO] [__main__] - LSTM model built successfully
+[2026-01-29T13:56:12] [INFO] [src.lstm_engine] - Starting LSTM training: batch_size=64, epochs=100, early_stopping_patience=10, training_samples=1033
+[2026-01-29T13:56:16] [ERROR] [src.lstm_engine] - LSTM training failed: Graph execution error:
+
+Detected at node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs defined at (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 646, in <module>
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 541, in main
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 311, in run_hybrid_forecast
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\src\lstm_engine.py", line 448, in train_lstm
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\utils\traceback_utils.py", line 117, in error_handler
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 399, in fit
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 241, in function
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 154, in multi_step_on_iterator
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 125, in wrapper
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 134, in one_step_on_data
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 81, in train_step
+
+Incompatible shapes: [64] vs. [64,5]
+	 [[{{node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs}}]] [Op:__inference_multi_step_on_iterator_3849]
+[2026-01-29T13:56:16] [ERROR] [src.lstm_engine] - Exception occurred: InvalidArgumentError
+Message: Graph execution error:
+
+Detected at node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs defined at (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 646, in <module>
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 541, in main
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 311, in run_hybrid_forecast
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\src\lstm_engine.py", line 448, in train_lstm
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\utils\traceback_utils.py", line 117, in error_handler
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 399, in fit
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 241, in function
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 154, in multi_step_on_iterator
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 125, in wrapper
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 134, in one_step_on_data
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 81, in train_step
+
+Incompatible shapes: [64] vs. [64,5]
+	 [[{{node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs}}]] [Op:__inference_multi_step_on_iterator_3849]
+Traceback:
+Traceback (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\src\lstm_engine.py", line 448, in train_lstm
+    history = model.fit(
+        X, y,
+    ...<4 lines>...
+        verbose=1  # Print progress to STDOUT
+    )
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\utils\traceback_utils.py", line 122, in error_handler
+    raise e.with_traceback(filtered_tb) from None
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\tensorflow\python\eager\execute.py", line 59, in quick_execute
+    except TypeError as e:
+    ...<5 lines>...
+      raise e
+tensorflow.python.framework.errors_impl.InvalidArgumentError: Graph execution error:
+
+Detected at node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs defined at (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 646, in <module>
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 541, in main
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 311, in run_hybrid_forecast
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\src\lstm_engine.py", line 448, in train_lstm
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\utils\traceback_utils.py", line 117, in error_handler
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 399, in fit
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 241, in function
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 154, in multi_step_on_iterator
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 125, in wrapper
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 134, in one_step_on_data
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 81, in train_step
+
+Incompatible shapes: [64] vs. [64,5]
+	 [[{{node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs}}]] [Op:__inference_multi_step_on_iterator_3849]
+
+[2026-01-29T13:56:16] [ERROR] [__main__] - Hybrid forecast workflow failed: Graph execution error:
+
+Detected at node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs defined at (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 646, in <module>
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 541, in main
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 311, in run_hybrid_forecast
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\src\lstm_engine.py", line 448, in train_lstm
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\utils\traceback_utils.py", line 117, in error_handler
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 399, in fit
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 241, in function
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 154, in multi_step_on_iterator
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 125, in wrapper
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 134, in one_step_on_data
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 81, in train_step
+
+Incompatible shapes: [64] vs. [64,5]
+	 [[{{node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs}}]] [Op:__inference_multi_step_on_iterator_3849]
+[2026-01-29T13:56:16] [ERROR] [__main__] - Exception occurred: InvalidArgumentError
+Message: Graph execution error:
+
+Detected at node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs defined at (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 646, in <module>
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 541, in main
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 311, in run_hybrid_forecast
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\src\lstm_engine.py", line 448, in train_lstm
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\utils\traceback_utils.py", line 117, in error_handler
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 399, in fit
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 241, in function
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 154, in multi_step_on_iterator
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 125, in wrapper
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 134, in one_step_on_data
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 81, in train_step
+
+Incompatible shapes: [64] vs. [64,5]
+	 [[{{node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs}}]] [Op:__inference_multi_step_on_iterator_3849]
+Traceback:
+Traceback (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 311, in run_hybrid_forecast
+    lstm_model = train_lstm(lstm_model, X, y, lstm_config)
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\src\lstm_engine.py", line 448, in train_lstm
+    history = model.fit(
+        X, y,
+    ...<4 lines>...
+        verbose=1  # Print progress to STDOUT
+    )
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\utils\traceback_utils.py", line 122, in error_handler
+    raise e.with_traceback(filtered_tb) from None
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\tensorflow\python\eager\execute.py", line 59, in quick_execute
+    except TypeError as e:
+    ...<5 lines>...
+      raise e
+tensorflow.python.framework.errors_impl.InvalidArgumentError: Graph execution error:
+
+Detected at node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs defined at (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 646, in <module>
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 541, in main
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 311, in run_hybrid_forecast
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\src\lstm_engine.py", line 448, in train_lstm
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\utils\traceback_utils.py", line 117, in error_handler
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 399, in fit
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 241, in function
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 154, in multi_step_on_iterator
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 125, in wrapper
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 134, in one_step_on_data
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 81, in train_step
+
+Incompatible shapes: [64] vs. [64,5]
+	 [[{{node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs}}]] [Op:__inference_multi_step_on_iterator_3849]
+
+[2026-01-29T13:56:16] [ERROR] [__main__] - Unexpected Error: Graph execution error:
+
+Detected at node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs defined at (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 646, in <module>
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 541, in main
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 311, in run_hybrid_forecast
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\src\lstm_engine.py", line 448, in train_lstm
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\utils\traceback_utils.py", line 117, in error_handler
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 399, in fit
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 241, in function
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 154, in multi_step_on_iterator
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 125, in wrapper
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 134, in one_step_on_data
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 81, in train_step
+
+Incompatible shapes: [64] vs. [64,5]
+	 [[{{node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs}}]] [Op:__inference_multi_step_on_iterator_3849]
+[2026-01-29T13:56:16] [ERROR] [__main__] - Exception occurred: InvalidArgumentError
+Message: Graph execution error:
+
+Detected at node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs defined at (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 646, in <module>
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 541, in main
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 311, in run_hybrid_forecast
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\src\lstm_engine.py", line 448, in train_lstm
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\utils\traceback_utils.py", line 117, in error_handler
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 399, in fit
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 241, in function
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 154, in multi_step_on_iterator
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 125, in wrapper
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 134, in one_step_on_data
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 81, in train_step
+
+Incompatible shapes: [64] vs. [64,5]
+	 [[{{node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs}}]] [Op:__inference_multi_step_on_iterator_3849]
+Traceback:
+Traceback (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 541, in main
+    results = run_hybrid_forecast(data, forecast_horizon=args.horizon, config=config)
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 311, in run_hybrid_forecast
+    lstm_model = train_lstm(lstm_model, X, y, lstm_config)
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\src\lstm_engine.py", line 448, in train_lstm
+    history = model.fit(
+        X, y,
+    ...<4 lines>...
+        verbose=1  # Print progress to STDOUT
+    )
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\utils\traceback_utils.py", line 122, in error_handler
+    raise e.with_traceback(filtered_tb) from None
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\tensorflow\python\eager\execute.py", line 59, in quick_execute
+    except TypeError as e:
+    ...<5 lines>...
+      raise e
+tensorflow.python.framework.errors_impl.InvalidArgumentError: Graph execution error:
+
+Detected at node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs defined at (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 646, in <module>
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 541, in main
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 311, in run_hybrid_forecast
+
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\src\lstm_engine.py", line 448, in train_lstm
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\utils\traceback_utils.py", line 117, in error_handler
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 399, in fit
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 241, in function
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 154, in multi_step_on_iterator
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 125, in wrapper
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 134, in one_step_on_data
+
+  File "C:\Users\win11\AppData\Local\Programs\Python\Python313\Lib\site-packages\keras\src\backend\tensorflow\trainer.py", line 81, in train_step
+
+Incompatible shapes: [64] vs. [64,5]
+	 [[{{node gradient_tape/compile_loss/mse/sub/BroadcastGradientArgs}}]] [Op:__inference_multi_step_on_iterator_3849]
+
+[2026-01-29T14:17:01] [INFO] [root] - Logging configured: level=INFO, file=output/run.log
+[2026-01-29T14:17:01] [INFO] [__main__] - Command-line arguments parsed
+[2026-01-29T14:17:01] [INFO] [__main__] -   Input: .\data\sample\crypto_sample.csv
+[2026-01-29T14:17:01] [INFO] [__main__] -   Ticker: BTC
+[2026-01-29T14:17:01] [INFO] [__main__] -   Horizon: 5
+[2026-01-29T14:17:01] [INFO] [__main__] -   Output: .\output\forecast_20260128_000000.csv
+[2026-01-29T14:17:01] [INFO] [__main__] -   Config: default
+[2026-01-29T14:17:01] [INFO] [__main__] - All CLI arguments validated successfully
+[2026-01-29T14:17:01] [INFO] [src.config_loader] - Loading configuration from config\model_params.yml
+[2026-01-29T14:17:01] [INFO] [src.config_loader] - Successfully loaded configuration from config\model_params.yml
+[2026-01-29T14:17:01] [INFO] [src.config_loader] - Configuration validation successful
+[2026-01-29T14:17:01] [INFO] [src.config_loader] - Configuration loaded and validated successfully
+[2026-01-29T14:17:01] [INFO] [__main__] - Loaded default configuration
+[2026-01-29T14:17:01] [INFO] [__main__] - 
+Loading data from .\data\sample\crypto_sample.csv
+[2026-01-29T14:17:01] [INFO] [src.preprocessing] - Loading CSV data from data\sample\crypto_sample.csv
+[2026-01-29T14:17:01] [INFO] [src.preprocessing] - Loaded 51 rows from data\sample\crypto_sample.csv. Data shape: (51, 6)
+[2026-01-29T14:17:01] [INFO] [__main__] - Data loaded successfully: shape=(51, 6)
+[2026-01-29T14:17:01] [INFO] [__main__] - 
+Starting hybrid forecasting workflow...
+[2026-01-29T14:17:01] [INFO] [__main__] - ================================================================================
+[2026-01-29T14:17:01] [INFO] [__main__] - STARTING HYBRID FORECAST WORKFLOW
+[2026-01-29T14:17:01] [INFO] [__main__] - ================================================================================
+[2026-01-29T14:17:01] [INFO] [__main__] - Using provided configuration
+[2026-01-29T14:17:01] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T14:17:01] [INFO] [__main__] - STEP 1: DATA PREPROCESSING
+[2026-01-29T14:17:01] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T14:17:01] [INFO] [__main__] - Extracted price series: 51 data points
+[2026-01-29T14:17:01] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 0
+[2026-01-29T14:17:01] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-29T14:17:01] [INFO] [src.preprocessing] - Calculating returns from price series of length 51
+[2026-01-29T14:17:01] [INFO] [src.preprocessing] - Returns calculated from 51 prices. Mean: 0.006504, Std: 0.002063
+[2026-01-29T14:17:01] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 1
+[2026-01-29T14:17:01] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-29T14:17:01] [INFO] [__main__] - Returns calculated: mean=0.006619, std=0.002201
+[2026-01-29T14:17:01] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T14:17:01] [INFO] [__main__] - STEP 2: ARIMA LINEAR COMPONENT
+[2026-01-29T14:17:01] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T14:17:01] [INFO] [src.arima_engine] - Performing ADF test on returns series of length 51
+[2026-01-29T14:17:01] [INFO] [src.arima_engine] - ADF test: statistic=-3.615970, p-value=0.005463, stationary=True
+[2026-01-29T14:17:01] [INFO] [__main__] - Stationarity test: stationary=True, p-value=0.005463
+[2026-01-29T14:17:01] [INFO] [src.arima_engine] - Starting auto-ARIMA search. Max P: 5, Max D: 2, Max Q: 5, Series length: 51
+[2026-01-29T14:17:37] [INFO] [src.arima_engine] - Optimal ARIMA order found: (1, 0, 0) with AIC: -508.7308
+[2026-01-29T14:17:37] [INFO] [__main__] - Optimal ARIMA order: (1, 0, 0)
+[2026-01-29T14:17:37] [INFO] [src.arima_engine] - Fitting ARIMA model with order (1, 0, 0) on returns series of length 51
+[2026-01-29T14:17:37] [INFO] [src.arima_engine] - ARIMA model fitted successfully with order (1, 0, 0). AIC: -508.7308, BIC: -502.9353
+[2026-01-29T14:17:37] [INFO] [src.arima_engine] - Extracting residuals from ARIMA model
+[2026-01-29T14:17:37] [INFO] [src.arima_engine] - Residuals extracted. Length: 51, Mean: -0.000080, Std: 0.001662, Min: -0.003594, Max: 0.005517
+[2026-01-29T14:17:37] [INFO] [__main__] - Residuals extracted: mean=-0.000080, std=0.001662
+[2026-01-29T14:17:37] [INFO] [__main__] - ARIMA forecast generated: 5 period(s)
+[2026-01-29T14:17:37] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T14:17:37] [INFO] [__main__] - STEP 3: LSTM NON-LINEAR COMPONENT
+[2026-01-29T14:17:37] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T14:17:37] [WARNING] [__main__] - Insufficient data for window_size=350. Data length: 51
+[2026-01-29T14:17:37] [INFO] [__main__] - Adjusted window_size to 17
+[2026-01-29T14:17:37] [ERROR] [src.lstm_engine] - Data length (51) must be at least window_size (350) + horizon (5) for rolling window creation.
+[2026-01-29T14:17:37] [ERROR] [__main__] - Hybrid forecast workflow failed: Data length (51) must be at least window_size (350) + horizon (5) for rolling window creation.
+[2026-01-29T14:17:37] [ERROR] [__main__] - Exception occurred: ValueError
+Message: Data length (51) must be at least window_size (350) + horizon (5) for rolling window creation.
+Traceback:
+Traceback (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 303, in run_hybrid_forecast
+    X, y = create_rolling_windows(data=residuals_array, config=window_config)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\src\lstm_engine.py", line 290, in create_rolling_windows
+    raise ValueError(error_msg)
+ValueError: Data length (51) must be at least window_size (350) + horizon (5) for rolling window creation.
+
+[2026-01-29T14:17:37] [ERROR] [__main__] - Validation Error: Data length (51) must be at least window_size (350) + horizon (5) for rolling window creation.
+[2026-01-29T14:17:37] [ERROR] [__main__] - Exception occurred: ValueError
+Message: Data length (51) must be at least window_size (350) + horizon (5) for rolling window creation.
+Traceback:
+Traceback (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 542, in main
+    results = run_hybrid_forecast(data, forecast_horizon=args.horizon, config=config)
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 303, in run_hybrid_forecast
+    X, y = create_rolling_windows(data=residuals_array, config=window_config)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\src\lstm_engine.py", line 290, in create_rolling_windows
+    raise ValueError(error_msg)
+ValueError: Data length (51) must be at least window_size (350) + horizon (5) for rolling window creation.
+
+[2026-01-29T14:28:56] [INFO] [root] - Logging configured: level=INFO, file=output/run.log
+[2026-01-29T14:28:56] [INFO] [__main__] - Command-line arguments parsed
+[2026-01-29T14:28:56] [INFO] [__main__] -   Input: .\data\sample\crypto_sample.csv
+[2026-01-29T14:28:56] [INFO] [__main__] -   Ticker: BTC
+[2026-01-29T14:28:56] [INFO] [__main__] -   Horizon: 5
+[2026-01-29T14:28:56] [INFO] [__main__] -   Output: .\output\forecast_20260129_000000.csv
+[2026-01-29T14:28:56] [INFO] [__main__] -   Config: default
+[2026-01-29T14:28:56] [INFO] [__main__] - All CLI arguments validated successfully
+[2026-01-29T14:28:56] [INFO] [src.config_loader] - Loading configuration from config\model_params.yml
+[2026-01-29T14:28:56] [INFO] [src.config_loader] - Successfully loaded configuration from config\model_params.yml
+[2026-01-29T14:28:56] [INFO] [src.config_loader] - Configuration validation successful
+[2026-01-29T14:28:56] [INFO] [src.config_loader] - Configuration loaded and validated successfully
+[2026-01-29T14:28:56] [INFO] [__main__] - Loaded default configuration
+[2026-01-29T14:28:56] [INFO] [__main__] - 
+Loading data from .\data\sample\crypto_sample.csv
+[2026-01-29T14:28:56] [INFO] [src.preprocessing] - Loading CSV data from data\sample\crypto_sample.csv
+[2026-01-29T14:28:56] [INFO] [src.preprocessing] - Loaded 51 rows from data\sample\crypto_sample.csv. Data shape: (51, 6)
+[2026-01-29T14:28:56] [INFO] [__main__] - Data loaded successfully: shape=(51, 6)
+[2026-01-29T14:28:56] [INFO] [__main__] - 
+Starting hybrid forecasting workflow...
+[2026-01-29T14:28:56] [INFO] [__main__] - ================================================================================
+[2026-01-29T14:28:56] [INFO] [__main__] - STARTING HYBRID FORECAST WORKFLOW
+[2026-01-29T14:28:56] [INFO] [__main__] - ================================================================================
+[2026-01-29T14:28:56] [INFO] [__main__] - Using provided configuration
+[2026-01-29T14:28:56] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T14:28:56] [INFO] [__main__] - STEP 1: DATA PREPROCESSING
+[2026-01-29T14:28:56] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T14:28:56] [INFO] [__main__] - Extracted price series: 51 data points
+[2026-01-29T14:28:56] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 0
+[2026-01-29T14:28:56] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-29T14:28:56] [INFO] [src.preprocessing] - Calculating returns from price series of length 51
+[2026-01-29T14:28:56] [INFO] [src.preprocessing] - Returns calculated from 51 prices. Mean: 0.006504, Std: 0.002063
+[2026-01-29T14:28:56] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 1
+[2026-01-29T14:28:56] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-29T14:28:56] [INFO] [__main__] - Returns calculated: mean=0.006619, std=0.002201
+[2026-01-29T14:28:56] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T14:28:56] [INFO] [__main__] - STEP 2: ARIMA LINEAR COMPONENT
+[2026-01-29T14:28:56] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T14:28:56] [INFO] [src.arima_engine] - Performing ADF test on returns series of length 51
+[2026-01-29T14:28:56] [INFO] [src.arima_engine] - ADF test: statistic=-3.615970, p-value=0.005463, stationary=True
+[2026-01-29T14:28:56] [INFO] [__main__] - Stationarity test: stationary=True, p-value=0.005463
+[2026-01-29T14:28:56] [INFO] [src.arima_engine] - Starting auto-ARIMA search. Max P: 5, Max D: 2, Max Q: 5, Series length: 51
+[2026-01-29T14:29:33] [INFO] [src.arima_engine] - Optimal ARIMA order found: (1, 0, 0) with AIC: -508.7308
+[2026-01-29T14:29:33] [INFO] [__main__] - Optimal ARIMA order: (1, 0, 0)
+[2026-01-29T14:29:33] [INFO] [src.arima_engine] - Fitting ARIMA model with order (1, 0, 0) on returns series of length 51
+[2026-01-29T14:29:33] [INFO] [src.arima_engine] - ARIMA model fitted successfully with order (1, 0, 0). AIC: -508.7308, BIC: -502.9353
+[2026-01-29T14:29:33] [INFO] [src.arima_engine] - Extracting residuals from ARIMA model
+[2026-01-29T14:29:33] [INFO] [src.arima_engine] - Residuals extracted. Length: 51, Mean: -0.000080, Std: 0.001662, Min: -0.003594, Max: 0.005517
+[2026-01-29T14:29:33] [INFO] [__main__] - Residuals extracted: mean=-0.000080, std=0.001662
+[2026-01-29T14:29:33] [INFO] [__main__] - ARIMA forecast generated: 5 period(s)
+[2026-01-29T14:29:33] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T14:29:33] [INFO] [__main__] - STEP 3: LSTM NON-LINEAR COMPONENT
+[2026-01-29T14:29:33] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T14:29:33] [INFO] [src.lstm_engine] - Creating rolling windows: data_length=51, window_size=10, stride=5, horizon=5
+[2026-01-29T14:29:33] [INFO] [src.lstm_engine] - Rolling windows created: X shape=(8, 10, 1), y shape=(8, 5), num_samples=8
+[2026-01-29T14:29:33] [INFO] [__main__] - Rolling windows created: X shape=(8, 10, 1), y shape=(8, 5)
+[2026-01-29T14:29:33] [INFO] [src.lstm_engine] - Building LSTM model: dropout_rate=0.2, l2_regularization=0.01, horizon=5, input_shape=(10, 1)
+[2026-01-29T14:29:33] [INFO] [src.lstm_engine] - Model compiled successfully with Adam optimizer, MSE loss, MAE metric
+[2026-01-29T14:29:33] [INFO] [__main__] - LSTM model built successfully
+[2026-01-29T14:29:33] [WARNING] [src.lstm_engine] - batch_size (64) exceeds data size (8). Adjusting batch_size to data size.
+[2026-01-29T14:29:33] [INFO] [src.lstm_engine] - Starting LSTM training: batch_size=8, epochs=100, early_stopping_patience=10, training_samples=8
+[2026-01-29T14:29:52] [INFO] [src.lstm_engine] - LSTM training completed. Final loss=0.037104, final val_loss=0.036911, final mae=0.000808, epochs_trained=100
+[2026-01-29T14:29:52] [INFO] [__main__] - LSTM model training completed
+[2026-01-29T14:29:52] [INFO] [src.lstm_engine] - Generating predictions for 8 samples
+[2026-01-29T14:29:53] [INFO] [src.lstm_engine] - Predictions generated: shape=(8, 5), mean=-0.000314, std=0.000524, min=-0.001270, max=0.000227
+[2026-01-29T14:29:53] [INFO] [__main__] - LSTM residual predictions: 8 values
+[2026-01-29T14:29:53] [INFO] [__main__] - LSTM forecast generated: 5 period(s)
+[2026-01-29T14:29:53] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T14:29:53] [INFO] [__main__] - STEP 4: HYBRID COMBINATION
+[2026-01-29T14:29:53] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T14:29:53] [WARNING] [src.hybrid_combiner] - combine_predictions() is deprecated. Use combine_forecasts() instead. Parameter 'lstm_residual_forecast' has been renamed to 'lstm_forecast'.
+[2026-01-29T14:29:53] [INFO] [src.hybrid_combiner] - Combining predictions: arima_shape=(5,), lstm_shape=(5,)
+[2026-01-29T14:29:53] [INFO] [src.hybrid_combiner] - Component statistics calculated: arima_mean=0.006187, lstm_mean=-0.000326, arima_contribution=21.13%, lstm_contribution=78.87%
+[2026-01-29T14:29:53] [INFO] [src.hybrid_combiner] - Hybrid combination successful. Final predictions shape: (5,)
+[2026-01-29T14:29:53] [INFO] [__main__] - Hybrid predictions generated: 5 values
+[2026-01-29T14:29:53] [INFO] [__main__] - Component contributions: ARIMA=21.13%, LSTM=78.87%
+[2026-01-29T14:29:53] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T14:29:53] [INFO] [__main__] - STEP 5: PRICE RECONSTRUCTION (RETURNS → PRICE SPACE)
+[2026-01-29T14:29:53] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T14:29:53] [INFO] [__main__] - Last observed price: $56000.00
+[2026-01-29T14:29:53] [INFO] [src.price_converter] - Reconstructing price series: last_price=56000.000000, forecast_length=5
+[2026-01-29T14:29:53] [INFO] [src.price_converter] - Price series reconstruction completed: initial_price=56000.000000, final_price=57660.533913, min_price=56324.213473, max_price=57660.533913
+[2026-01-29T14:29:53] [INFO] [__main__] - Price reconstruction successful
+[2026-01-29T14:29:53] [INFO] [__main__] -   Price range: $56324.21 - $57660.53
+[2026-01-29T14:29:53] [INFO] [src.price_converter] - Validating reconstructed prices: length=5
+[2026-01-29T14:29:53] [INFO] [src.price_converter] - Price validation complete: is_valid=True, has_negative=False, has_nan=False, has_inf=False
+[2026-01-29T14:29:53] [INFO] [src.price_converter] - All prices valid: range $56324.21 - $57660.53
+[2026-01-29T14:29:53] [INFO] [src.price_converter] - Statistics: mean=$56961.93, std=$475.98, median=$56949.48
+[2026-01-29T14:29:53] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T14:29:53] [INFO] [__main__] - STEP 6: EVALUATION AND METRICS (DUAL-SPACE)
+[2026-01-29T14:29:53] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T14:29:53] [ERROR] [__main__] - Hybrid forecast workflow failed: operands could not be broadcast together with shapes (8,) (8,5) 
+[2026-01-29T14:29:53] [ERROR] [__main__] - Exception occurred: ValueError
+Message: operands could not be broadcast together with shapes (8,) (8,5) 
+Traceback:
+Traceback (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 395, in run_hybrid_forecast
+    hybrid_fitted = arima_fitted + lstm_residual_predictions
+                    ~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~
+ValueError: operands could not be broadcast together with shapes (8,) (8,5) 
+
+[2026-01-29T14:29:53] [ERROR] [__main__] - Validation Error: operands could not be broadcast together with shapes (8,) (8,5) 
+[2026-01-29T14:29:53] [ERROR] [__main__] - Exception occurred: ValueError
+Message: operands could not be broadcast together with shapes (8,) (8,5) 
+Traceback:
+Traceback (most recent call last):
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 542, in main
+    results = run_hybrid_forecast(data, forecast_horizon=args.horizon, config=config)
+  File "C:\Users\win11\Projects\Python\LSTM_ARIMA_V2\forecaster.py", line 395, in run_hybrid_forecast
+    hybrid_fitted = arima_fitted + lstm_residual_predictions
+                    ~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~
+ValueError: operands could not be broadcast together with shapes (8,) (8,5) 
+
+[2026-01-29T15:31:29] [INFO] [root] - Logging configured: level=INFO, file=output/run.log
+[2026-01-29T15:31:29] [INFO] [__main__] - Command-line arguments parsed
+[2026-01-29T15:31:29] [INFO] [__main__] -   Input: .\data\sample\crypto_sample.csv
+[2026-01-29T15:31:29] [INFO] [__main__] -   Ticker: BTC
+[2026-01-29T15:31:29] [INFO] [__main__] -   Horizon: 5
+[2026-01-29T15:31:29] [INFO] [__main__] -   Output: .\output\forecast_20260129_000000.csv
+[2026-01-29T15:31:29] [INFO] [__main__] -   Config: default
+[2026-01-29T15:31:29] [INFO] [__main__] - All CLI arguments validated successfully
+[2026-01-29T15:31:29] [INFO] [src.config_loader] - Loading configuration from config\model_params.yml
+[2026-01-29T15:31:29] [INFO] [src.config_loader] - Successfully loaded configuration from config\model_params.yml
+[2026-01-29T15:31:29] [INFO] [src.config_loader] - Configuration validation successful
+[2026-01-29T15:31:29] [INFO] [src.config_loader] - Configuration loaded and validated successfully
+[2026-01-29T15:31:29] [INFO] [__main__] - Loaded default configuration
+[2026-01-29T15:31:29] [INFO] [__main__] - 
+Loading data from .\data\sample\crypto_sample.csv
+[2026-01-29T15:31:29] [INFO] [src.preprocessing] - Loading CSV data from data\sample\crypto_sample.csv
+[2026-01-29T15:31:29] [INFO] [src.preprocessing] - Loaded 51 rows from data\sample\crypto_sample.csv. Data shape: (51, 6)
+[2026-01-29T15:31:29] [INFO] [__main__] - Data loaded successfully: shape=(51, 6)
+[2026-01-29T15:31:29] [INFO] [__main__] - 
+Starting hybrid forecasting workflow...
+[2026-01-29T15:31:29] [INFO] [__main__] - ================================================================================
+[2026-01-29T15:31:29] [INFO] [__main__] - STARTING HYBRID FORECAST WORKFLOW
+[2026-01-29T15:31:29] [INFO] [__main__] - ================================================================================
+[2026-01-29T15:31:29] [INFO] [__main__] - Using provided configuration
+[2026-01-29T15:31:29] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T15:31:29] [INFO] [__main__] - STEP 1: DATA PREPROCESSING
+[2026-01-29T15:31:29] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T15:31:29] [INFO] [__main__] - Extracted price series: 51 data points
+[2026-01-29T15:31:29] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 0
+[2026-01-29T15:31:29] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-29T15:31:29] [INFO] [src.preprocessing] - Calculating returns from price series of length 51
+[2026-01-29T15:31:29] [INFO] [src.preprocessing] - Returns calculated from 51 prices. Mean: 0.006504, Std: 0.002063
+[2026-01-29T15:31:29] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 1
+[2026-01-29T15:31:29] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-29T15:31:29] [INFO] [__main__] - Returns calculated: mean=0.006619, std=0.002201
+[2026-01-29T15:31:29] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T15:31:29] [INFO] [__main__] - STEP 2: ARIMA LINEAR COMPONENT
+[2026-01-29T15:31:29] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T15:31:29] [INFO] [src.arima_engine] - Performing ADF test on returns series of length 51
+[2026-01-29T15:31:29] [INFO] [src.arima_engine] - ADF test: statistic=-3.615970, p-value=0.005463, stationary=True
+[2026-01-29T15:31:29] [INFO] [__main__] - Stationarity test: stationary=True, p-value=0.005463
+[2026-01-29T15:31:29] [INFO] [src.arima_engine] - Starting auto-ARIMA search. Max P: 5, Max D: 2, Max Q: 5, Series length: 51
+[2026-01-29T15:32:08] [INFO] [src.arima_engine] - Optimal ARIMA order found: (1, 0, 0) with AIC: -508.7308
+[2026-01-29T15:32:08] [INFO] [__main__] - Optimal ARIMA order: (1, 0, 0)
+[2026-01-29T15:32:08] [INFO] [src.arima_engine] - Fitting ARIMA model with order (1, 0, 0) on returns series of length 51
+[2026-01-29T15:32:08] [INFO] [src.arima_engine] - ARIMA model fitted successfully with order (1, 0, 0). AIC: -508.7308, BIC: -502.9353
+[2026-01-29T15:32:08] [INFO] [src.arima_engine] - Extracting residuals from ARIMA model
+[2026-01-29T15:32:08] [INFO] [src.arima_engine] - Residuals extracted. Length: 51, Mean: -0.000080, Std: 0.001662, Min: -0.003594, Max: 0.005517
+[2026-01-29T15:32:08] [INFO] [__main__] - Residuals extracted: mean=-0.000080, std=0.001662
+[2026-01-29T15:32:08] [INFO] [__main__] - ARIMA forecast generated: 5 period(s)
+[2026-01-29T15:32:08] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T15:32:08] [INFO] [__main__] - STEP 3: LSTM NON-LINEAR COMPONENT
+[2026-01-29T15:32:08] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T15:32:08] [INFO] [src.lstm_engine] - Creating rolling windows: data_length=51, window_size=10, stride=5, horizon=5
+[2026-01-29T15:32:08] [INFO] [src.lstm_engine] - Rolling windows created: X shape=(8, 10, 1), y shape=(8, 5), num_samples=8
+[2026-01-29T15:32:08] [INFO] [__main__] - Rolling windows created: X shape=(8, 10, 1), y shape=(8, 5)
+[2026-01-29T15:32:08] [INFO] [src.lstm_engine] - Building LSTM model: dropout_rate=0.2, l2_regularization=0.01, horizon=5, input_shape=(10, 1)
+[2026-01-29T15:32:08] [INFO] [src.lstm_engine] - Model compiled successfully with Adam optimizer, MSE loss, MAE metric
+[2026-01-29T15:32:08] [INFO] [__main__] - LSTM model built successfully
+[2026-01-29T15:32:08] [WARNING] [src.lstm_engine] - batch_size (64) exceeds data size (8). Adjusting batch_size to data size.
+[2026-01-29T15:32:08] [INFO] [src.lstm_engine] - Starting LSTM training: batch_size=8, epochs=100, early_stopping_patience=10, training_samples=8
+[2026-01-29T15:32:29] [INFO] [src.lstm_engine] - LSTM training completed. Final loss=0.047688, final val_loss=0.047456, final mae=0.000857, epochs_trained=100
+[2026-01-29T15:32:29] [INFO] [__main__] - LSTM model training completed
+[2026-01-29T15:32:29] [INFO] [src.lstm_engine] - Generating predictions for 8 samples
+[2026-01-29T15:32:30] [INFO] [src.lstm_engine] - Predictions generated: shape=(8, 5), mean=-0.000324, std=0.000586, min=-0.001348, max=0.000472
+[2026-01-29T15:32:30] [INFO] [__main__] - LSTM residual predictions: 8 values
+[2026-01-29T15:32:30] [INFO] [__main__] - LSTM forecast generated: 5 period(s)
+[2026-01-29T15:32:30] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T15:32:30] [INFO] [__main__] - STEP 4: HYBRID COMBINATION
+[2026-01-29T15:32:30] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T15:32:30] [WARNING] [src.hybrid_combiner] - combine_predictions() is deprecated. Use combine_forecasts() instead. Parameter 'lstm_residual_forecast' has been renamed to 'lstm_forecast'.
+[2026-01-29T15:32:30] [INFO] [src.hybrid_combiner] - Combining predictions: arima_shape=(5,), lstm_shape=(5,)
+[2026-01-29T15:32:30] [INFO] [src.hybrid_combiner] - Component statistics calculated: arima_mean=0.006187, lstm_mean=-0.000328, arima_contribution=18.25%, lstm_contribution=81.75%
+[2026-01-29T15:32:30] [INFO] [src.hybrid_combiner] - Hybrid combination successful. Final predictions shape: (5,)
+[2026-01-29T15:32:30] [INFO] [__main__] - Hybrid predictions generated: 5 values
+[2026-01-29T15:32:30] [INFO] [__main__] - Component contributions: ARIMA=18.25%, LSTM=81.75%
+[2026-01-29T15:32:30] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T15:32:30] [INFO] [__main__] - STEP 5: PRICE RECONSTRUCTION (RETURNS → PRICE SPACE)
+[2026-01-29T15:32:30] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T15:32:30] [INFO] [__main__] - Last observed price: $56000.00
+[2026-01-29T15:32:30] [INFO] [src.price_converter] - Reconstructing price series: last_price=56000.000000, forecast_length=5
+[2026-01-29T15:32:30] [INFO] [src.price_converter] - Price series reconstruction completed: initial_price=56000.000000, final_price=57659.924316, min_price=56330.201415, max_price=57659.924316
+[2026-01-29T15:32:30] [INFO] [__main__] - Price reconstruction successful
+[2026-01-29T15:32:30] [INFO] [__main__] -   Price range: $56330.20 - $57659.92
+[2026-01-29T15:32:30] [INFO] [src.price_converter] - Validating reconstructed prices: length=5
+[2026-01-29T15:32:30] [INFO] [src.price_converter] - Price validation complete: is_valid=True, has_negative=False, has_nan=False, has_inf=False
+[2026-01-29T15:32:30] [INFO] [src.price_converter] - All prices valid: range $56330.20 - $57659.92
+[2026-01-29T15:32:30] [INFO] [src.price_converter] - Statistics: mean=$56970.17, std=$474.32, median=$56969.01
+[2026-01-29T15:32:30] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T15:32:30] [INFO] [__main__] - STEP 6: EVALUATION AND METRICS (DUAL-SPACE)
+[2026-01-29T15:32:30] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T15:32:30] [INFO] [src.evaluation] - RMSE calculated: 0.002725
+[2026-01-29T15:32:30] [INFO] [src.evaluation] - MAE calculated: 0.002247
+[2026-01-29T15:32:30] [INFO] [__main__] - Returns Space Metrics (Historical Validation):
+[2026-01-29T15:32:30] [INFO] [__main__] -   RMSE: 0.002725
+[2026-01-29T15:32:30] [INFO] [__main__] -   MAE: 0.002247
+[2026-01-29T15:32:30] [INFO] [src.price_converter] - Reconstructing price series: last_price=40500.000000, forecast_length=8
+[2026-01-29T15:32:30] [INFO] [src.price_converter] - Price series reconstruction completed: initial_price=40500.000000, final_price=43456.479253, min_price=40783.339419, max_price=43456.479253
+[2026-01-29T15:32:30] [INFO] [src.evaluation] - RMSE calculated: 178.641216
+[2026-01-29T15:32:30] [INFO] [src.evaluation] - MAE calculated: 139.652582
+[2026-01-29T15:32:30] [INFO] [__main__] - Price Space Metrics (Historical Validation):
+[2026-01-29T15:32:30] [INFO] [__main__] -   RMSE: $178.64
+[2026-01-29T15:32:30] [INFO] [__main__] -   MAE: $139.65
+[2026-01-29T15:32:30] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T15:32:30] [INFO] [__main__] - BUILDING RESULTS DICTIONARY (DUAL-SPACE OUTPUT)
+[2026-01-29T15:32:30] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T15:32:30] [INFO] [__main__] - 
+================================================================================
+[2026-01-29T15:32:30] [INFO] [__main__] - HYBRID FORECAST WORKFLOW COMPLETED SUCCESSFULLY
+[2026-01-29T15:32:30] [INFO] [__main__] - ================================================================================
+[2026-01-29T15:32:30] [INFO] [src.output_manager] - Formatting results summary
+[2026-01-29T15:32:30] [INFO] [src.output_manager] - Results summary formatted successfully
+[2026-01-29T15:32:30] [INFO] [__main__] - 
+Exporting dual-space results to CSV...
+[2026-01-29T15:32:30] [INFO] [src.output_manager] - Output path validated: output
+[2026-01-29T15:32:30] [INFO] [src.output_manager] - CSV export successful: output\forecast_20260129_000000.csv (5 predictions)
+[2026-01-29T15:32:30] [INFO] [__main__] - Results exported successfully to: .\output\forecast_20260129_000000.csv
+[2026-01-29T15:32:30] [INFO] [__main__] - 
+================================================================================
+[2026-01-29T15:32:30] [INFO] [__main__] - FORECASTING PIPELINE COMPLETED SUCCESSFULLY
+[2026-01-29T15:32:30] [INFO] [__main__] - ================================================================================
+[2026-01-29T23:18:12] [INFO] [root] - Logging configured: level=INFO, file=output/run.log
+[2026-01-29T23:18:12] [INFO] [__main__] - Command-line arguments parsed
+[2026-01-29T23:18:12] [INFO] [__main__] -   Input: .\data\sample\BTC_USDT_14D.csv
+[2026-01-29T23:18:12] [INFO] [__main__] -   Ticker: BTC
+[2026-01-29T23:18:12] [INFO] [__main__] -   Horizon: 5
+[2026-01-29T23:18:12] [INFO] [__main__] -   Output: .\output\forecast_20260130_000000.csv
+[2026-01-29T23:18:12] [INFO] [__main__] -   Config: default
+[2026-01-29T23:18:12] [INFO] [__main__] - All CLI arguments validated successfully
+[2026-01-29T23:18:12] [INFO] [src.config_loader] - Loading configuration from config\model_params.yml
+[2026-01-29T23:18:12] [INFO] [src.config_loader] - Successfully loaded configuration from config\model_params.yml
+[2026-01-29T23:18:12] [INFO] [src.config_loader] - Configuration validation successful
+[2026-01-29T23:18:12] [INFO] [src.config_loader] - Configuration loaded and validated successfully
+[2026-01-29T23:18:12] [INFO] [__main__] - Loaded default configuration
+[2026-01-29T23:18:12] [INFO] [__main__] - 
+Loading data from .\data\sample\BTC_USDT_14D.csv
+[2026-01-29T23:18:12] [INFO] [src.preprocessing] - Loading CSV data from data\sample\BTC_USDT_14D.csv
+[2026-01-29T23:18:12] [INFO] [src.preprocessing] - Loaded 18362 rows from data\sample\BTC_USDT_14D.csv. Data shape: (18362, 6)
+[2026-01-29T23:18:12] [INFO] [__main__] - Data loaded successfully: shape=(18362, 6)
+[2026-01-29T23:18:12] [INFO] [__main__] - 
+Starting hybrid forecasting workflow...
+[2026-01-29T23:18:12] [INFO] [__main__] - ================================================================================
+[2026-01-29T23:18:12] [INFO] [__main__] - STARTING HYBRID FORECAST WORKFLOW
+[2026-01-29T23:18:12] [INFO] [__main__] - ================================================================================
+[2026-01-29T23:18:12] [INFO] [__main__] - Using provided configuration
+[2026-01-29T23:18:12] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T23:18:12] [INFO] [__main__] - STEP 1: DATA PREPROCESSING
+[2026-01-29T23:18:12] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T23:18:12] [INFO] [__main__] - Extracted price series: 18362 data points
+[2026-01-29T23:18:12] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 0
+[2026-01-29T23:18:12] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-29T23:18:12] [INFO] [src.preprocessing] - Calculating returns from price series of length 18362
+[2026-01-29T23:18:12] [INFO] [src.preprocessing] - Returns calculated from 18362 prices. Mean: 0.000004, Std: 0.000355
+[2026-01-29T23:18:12] [INFO] [src.preprocessing] - Imputing missing values. Missing count before: 1
+[2026-01-29T23:18:12] [INFO] [src.preprocessing] - Missing values after imputation: 0
+[2026-01-29T23:18:12] [INFO] [__main__] - Returns calculated: mean=0.000004, std=0.000355
+[2026-01-29T23:18:12] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T23:18:12] [INFO] [__main__] - STEP 2: ARIMA LINEAR COMPONENT
+[2026-01-29T23:18:12] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T23:18:12] [INFO] [src.arima_engine] - Performing ADF test on returns series of length 18362
+[2026-01-29T23:18:14] [INFO] [src.arima_engine] - ADF test: statistic=-22.540481, p-value=0.000000, stationary=True
+[2026-01-29T23:18:14] [INFO] [__main__] - Stationarity test: stationary=True, p-value=0.000000
+[2026-01-29T23:18:14] [INFO] [src.arima_engine] - Starting auto-ARIMA search. Max P: 5, Max D: 2, Max Q: 5, Series length: 18362
+[2026-01-29T23:40:08] [INFO] [src.arima_engine] - Optimal ARIMA order found: (5, 0, 5) with AIC: -239684.1927
+[2026-01-29T23:40:08] [INFO] [__main__] - Optimal ARIMA order: (5, 0, 5)
+[2026-01-29T23:40:08] [INFO] [src.arima_engine] - Fitting ARIMA model with order (5, 0, 5) on returns series of length 18362
+[2026-01-29T23:40:28] [INFO] [src.arima_engine] - ARIMA model fitted successfully with order (5, 0, 5). AIC: -239684.1927, BIC: -239590.3762
+[2026-01-29T23:40:28] [INFO] [src.arima_engine] - Extracting residuals from ARIMA model
+[2026-01-29T23:40:28] [INFO] [src.arima_engine] - Residuals extracted. Length: 18362, Mean: 0.000000, Std: 0.000354, Min: -0.005063, Max: 0.009412
+[2026-01-29T23:40:28] [INFO] [__main__] - Residuals extracted: mean=0.000000, std=0.000354
+[2026-01-29T23:40:28] [INFO] [__main__] - ARIMA forecast generated: 5 period(s)
+[2026-01-29T23:40:28] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T23:40:28] [INFO] [__main__] - STEP 3: LSTM NON-LINEAR COMPONENT
+[2026-01-29T23:40:28] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T23:40:28] [INFO] [src.lstm_engine] - Creating rolling windows: data_length=18362, window_size=350, stride=175, horizon=5
+[2026-01-29T23:40:28] [INFO] [src.lstm_engine] - Rolling windows created: X shape=(103, 350, 1), y shape=(103, 5), num_samples=103
+[2026-01-29T23:40:28] [INFO] [__main__] - Rolling windows created: X shape=(103, 350, 1), y shape=(103, 5)
+[2026-01-29T23:40:28] [INFO] [src.lstm_engine] - Building LSTM model: dropout_rate=0.2, l2_regularization=0.01, horizon=5, input_shape=(350, 1)
+[2026-01-29T23:40:29] [INFO] [src.lstm_engine] - Model compiled successfully with Adam optimizer, MSE loss, MAE metric
+[2026-01-29T23:40:29] [INFO] [__main__] - LSTM model built successfully
+[2026-01-29T23:40:29] [INFO] [src.lstm_engine] - Starting LSTM training: batch_size=64, epochs=100, early_stopping_patience=10, training_samples=103
+[2026-01-29T23:42:33] [INFO] [src.lstm_engine] - LSTM training completed. Final loss=0.020957, final val_loss=0.020753, final mae=0.000216, epochs_trained=100
+[2026-01-29T23:42:33] [INFO] [__main__] - LSTM model training completed
+[2026-01-29T23:42:33] [INFO] [src.lstm_engine] - Generating predictions for 103 samples
+[2026-01-29T23:42:39] [INFO] [src.lstm_engine] - Predictions generated: shape=(103, 5), mean=0.000041, std=0.000017, min=-0.000058, max=0.000097
+[2026-01-29T23:42:39] [INFO] [__main__] - LSTM residual predictions: 103 values
+[2026-01-29T23:42:39] [INFO] [__main__] - LSTM forecast generated: 5 period(s)
+[2026-01-29T23:42:39] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T23:42:39] [INFO] [__main__] - STEP 4: HYBRID COMBINATION
+[2026-01-29T23:42:39] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T23:42:39] [WARNING] [src.hybrid_combiner] - combine_predictions() is deprecated. Use combine_forecasts() instead. Parameter 'lstm_residual_forecast' has been renamed to 'lstm_forecast'.
+[2026-01-29T23:42:39] [INFO] [src.hybrid_combiner] - Combining predictions: arima_shape=(5,), lstm_shape=(5,)
+[2026-01-29T23:42:39] [INFO] [src.hybrid_combiner] - Component statistics calculated: arima_mean=0.000006, lstm_mean=0.000039, arima_contribution=34.50%, lstm_contribution=65.50%
+[2026-01-29T23:42:39] [INFO] [src.hybrid_combiner] - Hybrid combination successful. Final predictions shape: (5,)
+[2026-01-29T23:42:39] [INFO] [__main__] - Hybrid predictions generated: 5 values
+[2026-01-29T23:42:39] [INFO] [__main__] - Component contributions: ARIMA=34.50%, LSTM=65.50%
+[2026-01-29T23:42:39] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T23:42:39] [INFO] [__main__] - STEP 5: PRICE RECONSTRUCTION (RETURNS → PRICE SPACE)
+[2026-01-29T23:42:39] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T23:42:39] [INFO] [__main__] - Last observed price: $115991.90
+[2026-01-29T23:42:39] [INFO] [src.price_converter] - Reconstructing price series: last_price=115991.900000, forecast_length=5
+[2026-01-29T23:42:39] [INFO] [src.price_converter] - Price series reconstruction completed: initial_price=115991.900000, final_price=116017.772511, min_price=115999.212829, max_price=116017.772511
+[2026-01-29T23:42:39] [INFO] [__main__] - Price reconstruction successful
+[2026-01-29T23:42:39] [INFO] [__main__] -   Price range: $115999.21 - $116017.77
+[2026-01-29T23:42:39] [INFO] [src.price_converter] - Validating reconstructed prices: length=5
+[2026-01-29T23:42:39] [INFO] [src.price_converter] - Price validation complete: is_valid=True, has_negative=False, has_nan=False, has_inf=False
+[2026-01-29T23:42:39] [INFO] [src.price_converter] - All prices valid: range $115999.21 - $116017.77
+[2026-01-29T23:42:39] [INFO] [src.price_converter] - Statistics: mean=$116007.56, std=$6.99, median=$116005.89
+[2026-01-29T23:42:39] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T23:42:39] [INFO] [__main__] - STEP 6: EVALUATION AND METRICS (DUAL-SPACE)
+[2026-01-29T23:42:39] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T23:42:39] [INFO] [src.evaluation] - RMSE calculated: 0.000237
+[2026-01-29T23:42:39] [INFO] [src.evaluation] - MAE calculated: 0.000174
+[2026-01-29T23:42:39] [INFO] [__main__] - Returns Space Metrics (Historical Validation):
+[2026-01-29T23:42:39] [INFO] [__main__] -   RMSE: 0.000237
+[2026-01-29T23:42:39] [INFO] [__main__] -   MAE: 0.000174
+[2026-01-29T23:42:39] [INFO] [src.price_converter] - Reconstructing price series: last_price=106990.000000, forecast_length=103
+[2026-01-29T23:42:39] [INFO] [src.price_converter] - Price series reconstruction completed: initial_price=106990.000000, final_price=107531.700149, min_price=106995.166414, max_price=107531.700149
+[2026-01-29T23:42:39] [INFO] [src.evaluation] - RMSE calculated: 403.273772
+[2026-01-29T23:42:39] [INFO] [src.evaluation] - MAE calculated: 355.563771
+[2026-01-29T23:42:39] [INFO] [__main__] - Price Space Metrics (Historical Validation):
+[2026-01-29T23:42:39] [INFO] [__main__] -   RMSE: $403.27
+[2026-01-29T23:42:39] [INFO] [__main__] -   MAE: $355.56
+[2026-01-29T23:42:39] [INFO] [__main__] - 
+--------------------------------------------------------------------------------
+[2026-01-29T23:42:39] [INFO] [__main__] - BUILDING RESULTS DICTIONARY (DUAL-SPACE OUTPUT)
+[2026-01-29T23:42:39] [INFO] [__main__] - --------------------------------------------------------------------------------
+[2026-01-29T23:42:39] [INFO] [__main__] - 
+================================================================================
+[2026-01-29T23:42:39] [INFO] [__main__] - HYBRID FORECAST WORKFLOW COMPLETED SUCCESSFULLY
+[2026-01-29T23:42:39] [INFO] [__main__] - ================================================================================
+[2026-01-29T23:42:39] [INFO] [src.output_manager] - Formatting results summary
+[2026-01-29T23:42:39] [INFO] [src.output_manager] - Results summary formatted successfully
+[2026-01-29T23:42:39] [INFO] [__main__] - 
+Exporting dual-space results to CSV...
+[2026-01-29T23:42:39] [INFO] [src.output_manager] - Output path validated: output
+[2026-01-29T23:42:39] [INFO] [src.output_manager] - CSV export successful: output\forecast_20260130_000000.csv (5 predictions)
+[2026-01-29T23:42:39] [INFO] [__main__] - Results exported successfully to: .\output\forecast_20260130_000000.csv
+[2026-01-29T23:42:39] [INFO] [__main__] - 
+================================================================================
+[2026-01-29T23:42:39] [INFO] [__main__] - FORECASTING PIPELINE COMPLETED SUCCESSFULLY
+[2026-01-29T23:42:39] [INFO] [__main__] - ================================================================================

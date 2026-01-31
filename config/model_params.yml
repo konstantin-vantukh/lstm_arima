@@ -18,9 +18,10 @@ lstm:
   nodes: 10                   # Neurons per layer (valid range: 5-20)
   batch_size: 64              # Training batch size
   epochs: 100                 # Maximum training epochs
-  dropout_rate: 0.4           # Dropout regularization (0.0-1.0)
+  dropout_rate: 0.2           # Dropout regularization (0.0-1.0)
   l2_regularization: 0.01     # L2 weight regularization
-  window_size: 60             # Rolling window size for sequences
+  window_size: 350            # Rolling window size for sequences
+  stride: 175                 # Stride for rolling window creation
   optimizer: adam             # Adam, SGD, or RMSprop
   early_stopping_patience: 10 # Patience for early stopping
 

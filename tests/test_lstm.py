@@ -28,6 +28,7 @@ from src.lstm_engine import (
     train_lstm,
     predict_residuals
 )
+from src.exceptions import ConfigurationError, DataValidationError # Import custom exceptions
 
 
 # ============================================================================
@@ -38,19 +39,17 @@ from src.lstm_engine import (
 def lstm_config() -> dict:
     """
     Create a standard LSTM configuration for testing.
-    
+
     Returns:
         dict: Configuration with all required LSTM parameters
     """
     return {
-        'hidden_layers': 1,
-        'nodes': 10,
         'batch_size': 16,
         'epochs': 5,
         'dropout_rate': 0.4,
         'l2_regularization': 0.01,
         'window_size': 20,
-        'optimizer': 'adam',
+        'horizon': 1,  # Default horizon for tests
         'early_stopping_patience': 3
     }
 
@@ -73,16 +72,24 @@ def synthetic_residuals() -> np.ndarray:
 
 
 @pytest.fixture
-def rolling_windows_example() -> Tuple[np.ndarray, np.ndarray]:
+def rolling_windows_example(lstm_config: dict) -> Tuple[np.ndarray, np.ndarray]:
     """
     Create example rolling windows for testing.
-    
+
     Returns:
         Tuple[np.ndarray, np.ndarray]: X of shape (50, 20, 1), y of shape (50,)
     """
     np.random.seed(42)
     residuals = np.random.randn(70).astype(np.float32)
-    X, y = create_rolling_windows(residuals, window_size=20)
+    # Pass config dictionary to create_rolling_windows
+    config_for_rolling = lstm_config.copy()
+    # Ensure window_size is set if base lstm_config doesn't have it under 'lstm'
+    if 'lstm' not in config_for_rolling:
+        config_for_rolling['lstm'] = {}
+    config_for_rolling['lstm']['window_size'] = 20
+    # Also ensure stride is present
+    config_for_rolling['lstm']['stride'] = 1 # Default stride
+    X, y = create_rolling_windows(residuals, config_for_rolling)
     return X, y
 
 
@@ -96,13 +103,14 @@ def trained_lstm_model(lstm_config: dict, rolling_windows_example: Tuple) -> ker
     """
     X, y = rolling_windows_example
     input_shape = (lstm_config['window_size'], 1)
-    model = build_lstm_model(lstm_config, input_shape)
-    
+    # Ensure lstm_config includes horizon for build_lstm_model
+    model = build_lstm_model(lstm_config.copy(), input_shape)
+
     # Train with minimal epochs for testing
     small_config = lstm_config.copy()
     small_config['epochs'] = 3
     small_config['early_stopping_patience'] = 2
-    
+
     model = train_lstm(model, X, y, small_config)
     return model
 
@@ -144,16 +152,7 @@ class TestBuildLSTMModel:
         assert model.loss is not None, \
             "Model should be compiled with a loss function"
 
-    def test_build_lstm_model_layer_count(self, lstm_config: dict):
-        """
-        Verify model has expected number of layers.
-        
-        For hidden_layers=1, should have: LSTM + Dropout + Dense + Output = 4 layers
-        """
-        input_shape = (lstm_config['window_size'], 1)
-        model = build_lstm_model(lstm_config, input_shape)
-        
-        # Expected: LSTM + Dropout + Dense + Output layers
+        # Verify model has the expected layer structure (2 LSTMs, 1 Dropout, 1 Dense output)
         expected_layer_count = 4
         assert len(model.layers) == expected_layer_count, \
             f"Model should have {expected_layer_count} layers, got {len(model.layers)}"
@@ -176,12 +175,12 @@ class TestBuildLSTMModel:
         """
         input_shape = (lstm_config['window_size'], 1)
         model = build_lstm_model(lstm_config, input_shape)
-        
-        # Second layer should be Dropout
-        dropout_layer = model.layers[1]
+
+        # Dropout layer is now the third layer (index 2)
+        dropout_layer = model.layers[2]
         assert isinstance(dropout_layer, tf.keras.layers.Dropout), \
-            f"Second layer should be Dropout, got {type(dropout_layer)}"
-        
+            f"Third layer should be Dropout, got {type(dropout_layer)}"
+
         # Verify dropout rate
         assert dropout_layer.rate == lstm_config['dropout_rate'], \
             f"Dropout rate should be {lstm_config['dropout_rate']}, " \
@@ -189,61 +188,60 @@ class TestBuildLSTMModel:
 
     def test_build_lstm_model_output_layer_tanh(self, lstm_config: dict):
         """
-        Verify output layer has tanh activation for residual range [-2, 2].
+        Verify output layer has tanh activation and correct units (horizon).
         """
         input_shape = (lstm_config['window_size'], 1)
         model = build_lstm_model(lstm_config, input_shape)
-        
+
         # Last layer should be Dense with tanh activation
         output_layer = model.layers[-1]
         assert isinstance(output_layer, tf.keras.layers.Dense), \
             f"Output layer should be Dense, got {type(output_layer)}"
-        
+
+        # Verify units match horizon
+        assert output_layer.units == lstm_config['horizon'], \
+            f"Output layer units should be {lstm_config['horizon']}, " \
+            f"got {output_layer.units}"
+
         # Verify tanh activation
         assert output_layer.activation == tf.keras.activations.tanh, \
             f"Output layer should have tanh activation, " \
             f"got {output_layer.activation}"
 
+
     def test_build_lstm_model_lstm_nodes(self, lstm_config: dict):
         """
-        Verify LSTM layer has correct number of nodes.
+        Verify LSTM layers have correct number of nodes (hardcoded).
         """
         input_shape = (lstm_config['window_size'], 1)
         model = build_lstm_model(lstm_config, input_shape)
-        
-        lstm_layer = model.layers[0]
-        assert lstm_layer.units == lstm_config['nodes'], \
-            f"LSTM should have {lstm_config['nodes']} nodes, got {lstm_layer.units}"
 
-    def test_build_lstm_model_with_multiple_layers(self):
-        """
-        Verify model construction with multiple LSTM layers.
-        """
-        config = {
-            'hidden_layers': 2,
-            'nodes': 10,
-            'dropout_rate': 0.4,
-            'l2_regularization': 0.01,
-            'optimizer': 'adam'
-        }
-        input_shape = (20, 1)
-        model = build_lstm_model(config, input_shape)
-        
-        # With hidden_layers=2: LSTM + LSTM + Dropout + Dense + Output = 5 layers
-        expected_layer_count = 5
-        assert len(model.layers) == expected_layer_count, \
-            f"Model with 2 hidden layers should have {expected_layer_count} layers, " \
-            f"got {len(model.layers)}"
+        # First LSTM layer (hardcoded to 20 units)
+        first_lstm_layer = model.layers[0]
+        assert isinstance(first_lstm_layer, tf.keras.layers.LSTM), \
+            f"First layer should be LSTM, got {type(first_lstm_layer)}"
+        assert first_lstm_layer.units == 20, \
+            f"First LSTM layer should have 20 nodes, got {first_lstm_layer.units}"
+
+        # Second LSTM layer (hardcoded to 10 units)
+        second_lstm_layer = model.layers[1]
+        assert isinstance(second_lstm_layer, tf.keras.layers.LSTM), \
+            f"Second layer should be LSTM, got {type(second_lstm_layer)}"
+        assert second_lstm_layer.units == 10, \
+            f"Second LSTM layer should have 10 nodes, got {second_lstm_layer.units}"
 
     def test_build_lstm_model_optimizer_adam(self, lstm_config: dict):
         """
-        Verify model uses Adam optimizer.
+        Verify model uses Adam optimizer with default learning rate.
         """
         input_shape = (lstm_config['window_size'], 1)
         model = build_lstm_model(lstm_config, input_shape)
-        
+
         assert isinstance(model.optimizer, tf.keras.optimizers.Adam), \
             f"Optimizer should be Adam, got {type(model.optimizer)}"
+        # Verify default learning rate
+        assert np.isclose(model.optimizer.lr.numpy(), 0.001), \
+            f"Optimizer learning rate should be 0.001, got {model.optimizer.lr.numpy()}"
 
     def test_build_lstm_model_mse_loss(self, lstm_config: dict):
         """
@@ -251,9 +249,31 @@ class TestBuildLSTMModel:
         """
         input_shape = (lstm_config['window_size'], 1)
         model = build_lstm_model(lstm_config, input_shape)
-        
-        assert 'mse' in str(model.loss).lower(), \
+
+        assert model.loss == 'mse', \
             f"Loss should be MSE, got {model.loss}"
+
+    @pytest.mark.parametrize("dropout, l2_reg, horizon, input_s, expected_error, error_msg", [
+        (1.5, 0.01, 1, (20, 1), ConfigurationError, "dropout_rate must be in [0, 1)"),
+        (-0.1, 0.01, 1, (20, 1), ConfigurationError, "dropout_rate must be in [0, 1)"),
+        (0.2, -0.01, 1, (20, 1), ConfigurationError, "l2_regularization must be non-negative"),
+        (0.2, 0.01, 0, (20, 1), ConfigurationError, "horizon must be positive"),
+        (0.2, 0.01, -1, (20, 1), ConfigurationError, "horizon must be positive"),
+        (0.2, 0.01, 1, (20,), ValueError, "input_shape must be 2D"),
+        (0.2, 0.01, 1, (0, 1), ValueError, "input_shape dimensions must be positive"),
+        (0.2, 0.01, 1, (20, 0), ValueError, "input_shape dimensions must be positive"),
+    ])
+    def test_build_lstm_model_validation_errors(self, dropout, l2_reg, horizon, input_s, expected_error, error_msg):
+        """
+        Verify build_lstm_model raises appropriate errors for invalid configurations.
+        """
+        config = {
+            'dropout_rate': dropout,
+            'l2_regularization': l2_reg,
+            'horizon': horizon,
+        }
+        with pytest.raises(expected_error, match=error_msg):
+            build_lstm_model(config, input_s)
 
 
 # ============================================================================
@@ -269,37 +289,38 @@ class TestBuildLSTMModelOutputShape:
 
     def test_build_lstm_model_output_shape(self, lstm_config: dict, rolling_windows_example: Tuple):
         """
-        Verify model output shape matches expected format.
-        
-        Model should produce predictions of shape (samples, 1) for 1D output.
+        Verify model output shape matches expected format (samples, horizon).
+
         This test validates UT2 from architecture.md Section 11.2.
         """
         input_shape = (lstm_config['window_size'], 1)
         model = build_lstm_model(lstm_config, input_shape)
-        
+
         X, _ = rolling_windows_example
         predictions = model.predict(X, verbose=0)
-        
-        # Output should be [samples, 1]
-        assert predictions.shape[0] == X.shape[0], \
-            f"Output samples should match input samples: {predictions.shape[0]} != {X.shape[0]}"
-        assert predictions.shape[1] == 1, \
-            f"Output should have 1 feature, got {predictions.shape[1]}"
+
+        # Output should be [samples, horizon]
+        expected_shape = (X.shape[0], lstm_config['horizon'])
+        assert predictions.shape == expected_shape, \
+            f"Output shape should be {expected_shape}, got {predictions.shape}"
 
     def test_build_lstm_model_output_shape_batch_predictions(self, lstm_config: dict):
         """
-        Verify output shape consistency for different batch sizes.
+        Verify output shape consistency for different batch sizes and horizon.
         """
+        # Test with a specific horizon > 1
+        lstm_config['horizon'] = 3
         input_shape = (lstm_config['window_size'], 1)
         model = build_lstm_model(lstm_config, input_shape)
-        
+
         # Test with different batch sizes
         for batch_size in [1, 5, 10, 32]:
             X_batch = np.random.randn(batch_size, lstm_config['window_size'], 1).astype(np.float32)
             predictions = model.predict(X_batch, verbose=0)
-            
-            assert predictions.shape == (batch_size, 1), \
-                f"Output shape should be ({batch_size}, 1), got {predictions.shape}"
+
+            expected_shape = (batch_size, lstm_config['horizon'])
+            assert predictions.shape == expected_shape, \
+                f"Output shape should be {expected_shape}, got {predictions.shape}"
 
     def test_build_lstm_model_output_dtype(self, lstm_config: dict, rolling_windows_example: Tuple):
         """
@@ -336,13 +357,14 @@ class TestCreateRollingWindows:
         contract requirement UT2: "Ensure LSTM output buffer matches the
         dimension of the ARIMA residual input".
         """
-        window_size = 20
-        X, y = create_rolling_windows(synthetic_residuals, window_size=window_size)
-        
+        config_for_rolling = lstm_config.copy()
+        config_for_rolling['lstm'] = {'window_size': 20, 'stride': 1} # Ensure window_size and stride
+        X, y = create_rolling_windows(synthetic_residuals, config_for_rolling)
+
         # X should be 3D: [samples, window_size, 1]
         assert len(X.shape) == 3, \
             f"X should be 3D tensor, got shape {X.shape}"
-        
+
         # y should be 1D: [samples]
         assert len(y.shape) == 1, \
             f"y should be 1D array, got shape {y.shape}"
@@ -353,10 +375,11 @@ class TestCreateRollingWindows:
         
         With data length N and window_size W, should generate N - W samples.
         """
-        window_size = 20
-        X, y = create_rolling_windows(synthetic_residuals, window_size=window_size)
+        config_for_rolling = lstm_config.copy()
+        config_for_rolling['lstm'] = {'window_size': 20, 'stride': 1}
+        X, y = create_rolling_windows(synthetic_residuals, config_for_rolling)
         
-        expected_samples = len(synthetic_residuals) - window_size
+        expected_samples = len(synthetic_residuals) - config_for_rolling['lstm']['window_size']
         assert X.shape[0] == expected_samples, \
             f"Should have {expected_samples} samples, got {X.shape[0]}"
         assert y.shape[0] == expected_samples, \
@@ -366,12 +389,13 @@ class TestCreateRollingWindows:
         """
         Verify window size parameter is respected.
         """
-        window_size = 30
-        X, y = create_rolling_windows(synthetic_residuals, window_size=window_size)
+        config_for_rolling = lstm_config.copy()
+        config_for_rolling['lstm'] = {'window_size': 30, 'stride': 1}
+        X, y = create_rolling_windows(synthetic_residuals, config_for_rolling)
         
         # X should have second dimension equal to window_size
-        assert X.shape[1] == window_size, \
-            f"Window size should be {window_size}, got {X.shape[1]}"
+        assert X.shape[1] == config_for_rolling['lstm']['window_size'], \
+            f"Window size should be {config_for_rolling['lstm']['window_size']}, got {X.shape[1]}"
 
     def test_create_rolling_windows_features_dimension(self, synthetic_residuals: np.ndarray):
         """
